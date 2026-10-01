@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mycroftcompute: where your Claude Code money goes</title>
+<meta name="description" content="mycroftcompute is an open-source command-line tool. It reads your Claude Code history, or your team's Grafana or Datadog telemetry, prices every token with the prompt cache counted, and prints what is worth changing. MIT licensed, nothing uploaded.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230b0c0e'/%3E%3Crect x='4' y='9.5' width='10' height='10' rx='1.2' fill='%23eeeeea'/%3E%3Ccircle cx='14.5' cy='9.5' r='5' fill='none' stroke='%23f2b43c' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/mona-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/martian-mono-var.woff2" as="font" type="font/woff2" crossorigin>
+<script src="js/boot.js"></script>
+<!--
+  Mycroft landing page. Built with the build-awwwards-quality-sites skill, paired with landing-page.
+
+  Direction: a dark measuring instrument lit by one sodium-amber accent. The page leads with the
+  gain (where the money went, what is worth changing), shows the four findings of a sample report
+  straight after the hero, then the cache story, the command line, and how to install it.
+
+  Sample figures are quoted only from docs/sample-report-august.txt and
+  docs/sample-report-september.txt: an invented 24-developer team run through the real engine
+  (`mycroftcompute --sample` prints the September one). Ceilings overlap, so they are never added.
+
+  Provenance (nothing loads from a third party at runtime):
+  - Mona Sans (GitHub, OFL 1.1) and Martian Mono (Evil Martians, OFL 1.1), via @fontsource. licenses/
+  - GSAP 3.12.5 and ScrollTrigger 3.12.5 (GreenSock standard licence), Lenis 1.3.26 (MIT). js/
+  - Interface icons: Solar by 480 Design, CC BY 4.0, via Iconify. Credited in licenses/CREDITS.txt.
+  - Grafana and Datadog marks: Iconify "logos" set (CC0). Trademarks of their owners, shown only
+    as "works with". No Anthropic or Claude mark is used.
+  - No photographs, avatars or illustrations. Every visual is the product's own UI or arithmetic.
+  - Chart geometry is computed by site-src/build.py from src/mycroftcompute/economics/caching.py.
+-->
+<style>
+/* Build stamp: skill=build-awwwards-quality-sites+landing-page | lane=dark instrument, sodium amber
+   | type=Mona Sans (wdth 75-125) + Martian Mono | motion=GSAP+ScrollTrigger, Lenis | three.js=no */
+
+@font-face { font-family: "Mona Sans"; src: url("fonts/mona-sans-var.woff2") format("woff2"); font-weight: 200 900; font-stretch: 75% 125%; font-display: swap; }
+@font-face { font-family: "Martian Mono"; src: url("fonts/martian-mono-var.woff2") format("woff2"); font-weight: 100 800; font-stretch: 75% 112.5%; font-display: swap; }
+
+:root {
+  /* Light theme. Every text pairing checked at 4.5:1 or better. */
+  --bg: #f4f4f1;
+  --raise: #ffffff;
+  --sunk: #ebebe7;
+  --ink: #0d0f12;
+  --ink-2: #30353c;
+  --muted: #5a6069;
+  --faint: #646a73;
+  --line: #dedfda;
+  --line-2: #c9cbc5;
+  --accent: #8a5600;        /* text in amber */
+  --accent-fill: #e3a12f;   /* fills, never text */
+  --accent-line: #b06f00;   /* chart line, 3:1 on paper */
+  --accent-wash: rgba(227, 161, 47, .16);
+  --red: #b8402b;
+  --ok: #1c7444;
+  --stay: #48505a;
+  --btn-bg: #0d0f12;
+  --btn-fg: #ffffff;
+  --tile: #ffffff;
+  --shadow: 0 1px 0 rgba(13,15,18,.04), 0 24px 60px -24px rgba(13,15,18,.18), 0 60px 120px -60px rgba(13,15,18,.22);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0c0e; --raise: #121418; --sunk: #08090b; --ink: #eeeeea; --ink-2: #c5c8cd; --muted: #8e939b;
+    --faint: #7a8089; --line: #1f2227; --line-2: #2c3037; --accent: #f2b43c; --accent-fill: #f2b43c;
+    --accent-line: #f2b43c; --accent-wash: rgba(242, 180, 60, .12); --red: #ff7a66; --ok: #6fcf97;
+    --stay: #b4bac2; --btn-bg: #f2b43c; --btn-fg: #0b0c0e; --tile: #eeeeea;
+    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 30px 80px -30px rgba(0,0,0,.8), 0 80px 160px -80px rgba(0,0,0,.9);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0c0e; --raise: #121418; --sunk: #08090b; --ink: #eeeeea; --ink-2: #c5c8cd; --muted: #8e939b;
+  --faint: #7a8089; --line: #1f2227; --line-2: #2c3037; --accent: #f2b43c; --accent-fill: #f2b43c;
+  --accent-line: #f2b43c; --accent-wash: rgba(242, 180, 60, .12); --red: #ff7a66; --ok: #6fcf97;
+  --stay: #b4bac2; --btn-bg: #f2b43c; --btn-fg: #0b0c0e; --tile: #eeeeea;
+  --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 30px 80px -30px rgba(0,0,0,.8), 0 80px 160px -80px rgba(0,0,0,.9);
+  color-scheme: dark;
+}
+
+:root {
+  --sans: "Mona Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 48px);
+  --max: 1280px;
+  --section: clamp(56px, 6vw, 88px);
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 22px;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --nav-h: 64px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 16px); }
+@media (prefers-reduced-motion: no-preference) { html:not(.lenis) { scroll-behavior: smooth; } }
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-stopped { overflow: clip; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 17px; line-height: 1.6; font-weight: 420; font-stretch: 100%;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; }
+p { margin: 0; }
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 640; text-wrap: balance; }
+code, .mono { font-family: var(--mono); font-stretch: 87.5%; font-size: .84em; font-weight: 420; letter-spacing: 0; }
+code { background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; padding: .08em .38em; white-space: nowrap; }
+::selection { background: var(--accent-fill); color: #0b0c0e; }
+:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 3px; border-radius: 4px; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--btn-bg); color: var(--btn-fg); padding: 10px 14px; border-radius: var(--r-sm); text-decoration: none; font-weight: 600; }
+.skip:focus { top: 12px; }
+.wrap { width: 100%; max-width: calc(var(--max) + var(--gutter) * 2); margin: 0 auto; padding: 0 var(--gutter); }
+.i { width: 1.15em; height: 1.15em; flex: none; }
+
+/* Page frame: two hairlines at the container edges, the instrument's scale. */
+.frame { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.frame::before, .frame::after { content: ""; position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); opacity: .7; }
+.frame::before { left: max(var(--gutter), calc((100vw - var(--max)) / 2 - 1px)); }
+.frame::after { right: max(var(--gutter), calc((100vw - var(--max)) / 2 - 1px)); }
+@media (max-width: 720px) { .frame { display: none; } }
+main, header, footer { position: relative; z-index: 1; }
+
+/* Buttons and links */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 20px 0 22px;
+  background: var(--btn-bg); color: var(--btn-fg); border-radius: 999px; text-decoration: none;
+  font-weight: 620; font-stretch: 104%; font-size: 16px; letter-spacing: -.005em;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease), background-color .2s;
+  box-shadow: 0 0 0 0 var(--accent-wash);
+}
+.btn .i { transition: transform .3s var(--ease); }
+@media (hover: hover) {
+  .btn:hover { box-shadow: 0 0 0 6px var(--accent-wash); }
+  .btn:hover .i { transform: translateX(3px); }
+}
+.btn:active { transform: scale(.98); }
+.btn-sm { min-height: 38px; padding: 0 16px; font-size: 14.5px; }
+.link { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; color: var(--ink); font-weight: 560; text-decoration: none; }
+.link span { background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1px no-repeat; padding-bottom: 2px; transition: background-size .3s var(--ease); }
+@media (hover: hover) { .link:hover span { background-size: 0 1px; background-position: 100% 100%; } }
+
+/* Mail fallbacks: mailto needs a mail app, so the address is always visible and copyable. */
+.mail-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+.mail-alt .addr { font-family: var(--mono); font-stretch: 87.5%; font-size: 13px; color: var(--ink); margin-right: 4px; user-select: all; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; text-decoration: none; cursor: pointer; transition: background-color .2s, border-color .2s, color .2s; }
+.chip .i { width: 14px; height: 14px; }
+@media (hover: hover) { .chip:hover { background: var(--sunk); border-color: var(--line-2); color: var(--ink); } }
+.chip.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.chip[data-copy] { display: none; }
+html.js .chip[data-copy] { display: inline-flex; }
+
+/* Apply menu: mailto alone does nothing without a desktop mail app, so the button offers every route. */
+.apply-pop { position: fixed; z-index: 60; width: min(300px, calc(100vw - 24px)); padding: 8px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+.apply-pop[hidden] { display: none; }
+.ap-head { padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.ap-head .addr { display: block; margin-top: 2px; font-family: var(--mono); font-stretch: 87.5%; font-size: 13px; color: var(--ink); user-select: all; }
+.ap-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink); font: inherit; font-size: 15px; font-weight: 540; text-align: left; text-decoration: none; cursor: pointer; }
+.ap-item .i { width: 18px; height: 18px; color: var(--muted); }
+.ap-item:hover, .ap-item:focus-visible { background: var(--sunk); }
+.ap-item.done, .ap-item.done .i { color: var(--ok); }
+
+/* Section scaffolding */
+.section { padding: var(--section) 0; position: relative; }
+.label {
+  display: flex; align-items: center; gap: 14px; margin-bottom: clamp(24px, 3vw, 36px);
+  font-family: var(--mono); font-stretch: 87.5%; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.label b { color: var(--accent); font-weight: 500; }
+.label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.h2 { font-size: clamp(30px, 3.9vw, 56px); line-height: 1.03; letter-spacing: -.034em; font-stretch: 108%; font-weight: 640; max-width: 24ch; }
+.intro { color: var(--ink-2); font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; max-width: 58ch; margin-top: 20px; }
+.head-row { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 20px 64px; align-items: end; }
+.head-row .intro { margin-top: 0; }
+@media (max-width: 900px) { .head-row { grid-template-columns: minmax(0, 1fr); } }
+.split .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .12em; margin: 0 -.02em -.12em; }
+.split .wi { display: inline-block; }
+.tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; background: var(--accent-wash); color: var(--accent); font-weight: 500; white-space: nowrap; }
+.tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-fill); }
+.sample-note { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+
+/* Motion pre-states: only when boot.js has confirmed motion is allowed. */
+html.motion [data-split] { visibility: hidden; }
+html.motion [data-reveal] { opacity: 0; }
+
+/* ---------- Nav ---------- */
+.nav { position: sticky; top: 0; z-index: 50; height: var(--nav-h); background: var(--bg); transition: box-shadow .3s; }
+.nav.is-stuck { box-shadow: 0 1px 0 var(--line); }
+.nav .wrap { height: 100%; display: flex; align-items: center; gap: 28px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; font-stretch: 112%; font-size: 18px; letter-spacing: -.02em; }
+.mark { width: 24px; height: 24px; }
+.mark .sq { fill: currentColor; }
+.mark .lens { fill: none; stroke: var(--accent-fill); stroke-width: 2; }
+.nav-links { display: flex; gap: 4px; margin-left: 12px; }
+.nav-links a { padding: 8px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); font-size: 15px; font-weight: 520; transition: color .2s, background-color .2s; }
+@media (hover: hover) { .nav-links a:hover { color: var(--ink); background: var(--sunk); } }
+.nav-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; transition: background-color .2s, border-color .2s; }
+@media (hover: hover) { .icon-btn:hover { background: var(--sunk); border-color: var(--line-2); } }
+.theme-btn .moon { display: none; }
+:root[data-theme="light"] .theme-btn .sun { display: none; }
+:root[data-theme="light"] .theme-btn .moon { display: block; }
+.theme-btn { display: none; }
+html.js .theme-btn { display: grid; }
+.menu { display: none; position: relative; }
+.menu summary { list-style: none; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu-panel { position: absolute; right: 0; top: calc(100% + 10px); min-width: 220px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px; box-shadow: var(--shadow); display: grid; }
+.menu-panel a { padding: 12px 14px; border-radius: var(--r-md); text-decoration: none; font-weight: 540; }
+.menu-panel a:hover { background: var(--sunk); }
+@media (max-width: 880px) {
+  .nav-links { display: none; }
+  .menu { display: block; }
+}
+@media (max-width: 420px) { .nav .btn-sm { display: none; } }
+
+/* ---------- Hero ---------- */
+.hero { padding: clamp(28px, 4vw, 56px) 0 clamp(56px, 7vw, 96px); }
+.status { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; color: var(--ink-2); background: var(--raise); }
+.status .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-fill); box-shadow: 0 0 0 4px var(--accent-wash); flex: none; }
+.status b { font-weight: 620; color: var(--ink); }
+.h1 {
+  margin-top: clamp(22px, 3vw, 36px);
+  font-size: clamp(36px, 4.5vw, 68px); line-height: .98; letter-spacing: -.044em; font-weight: 680; font-stretch: 112%;
+  max-width: none;
+}
+.h1 .soft { color: var(--muted); display: block; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(32px, 5vw, 72px); margin-top: clamp(32px, 4vw, 52px); align-items: start; }
+.hero-copy { padding-top: 4px; }
+.lede { font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; color: var(--ink-2); max-width: 40ch; }
+.lede strong { color: var(--ink); font-weight: 620; }
+.ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; margin-top: 28px; }
+.works { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
+.works-label { font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.works ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.works li { display: inline-flex; align-items: center; gap: 10px; font-weight: 580; font-size: 15.5px; }
+.tile { width: 30px; height: 30px; border-radius: 8px; background: var(--tile); display: grid; place-items: center; box-shadow: 0 0 0 1px var(--line); flex: none; }
+.tile .logo { width: 18px; height: 18px; }
+.tile.sm { width: 18px; height: 18px; border-radius: 5px; }
+.tile.sm .logo { width: 12px; height: 12px; }
+.readonly { display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; font-size: 14.5px; color: var(--muted); line-height: 1.5; max-width: 40ch; }
+.readonly .i { color: var(--ok); margin-top: 2px; }
+@media (max-width: 1023px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .lede, .readonly { max-width: 58ch; }
+}
+
+/* ---------- App window (every preview) ---------- */
+.win { background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow); overflow: hidden; font-size: 14.5px; line-height: 1.5; color: var(--ink); transform-origin: 50% 0; }
+.win-bar { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--raise); }
+.win-bar .mark { width: 18px; height: 18px; flex: none; }
+.crumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13.5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb b { color: var(--ink); font-weight: 580; }
+.win-bar .tag { margin-left: auto; }
+.pane { padding: clamp(18px, 2.4vw, 32px); min-width: 0; }
+.win-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px; padding: 14px clamp(18px, 2.4vw, 32px); border-top: 1px solid var(--line); background: var(--sunk); font-size: 13.5px; color: var(--ink-2); }
+.win-foot b { color: var(--accent); font-weight: 620; }
+.win-foot a { color: var(--ink); font-weight: 580; text-underline-offset: 4px; }
+.price-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.price-note .i { width: 15px; height: 15px; color: var(--ok); }
+.find-no { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--bg); font-family: var(--mono); font-stretch: 87.5%; font-size: 12px; font-weight: 500; flex: none; }
+.num { font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.num.dim { color: var(--muted); }
+.cap { margin: 0 0 10px; font-family: var(--mono); font-stretch: 87.5%; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); font-weight: 450; }
+@media (max-width: 520px) {
+  .win { font-size: 13.5px; border-radius: var(--r-lg); }
+  .win-bar .tag { display: none; }
+}
+
+/* Hero report: where the money went */
+.rep-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.rep-title { font-size: 13.5px; color: var(--muted); }
+.rep-total { font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(30px, 3.4vw, 44px); letter-spacing: -.045em; line-height: 1.05; margin-top: 6px; font-weight: 420; }
+.rep-total small { font-family: var(--sans); font-stretch: 100%; font-size: 13.5px; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
+.rep-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.meta-pill { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--sunk); color: var(--ink-2); border: 1px solid var(--line); }
+.rep-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 20px; }
+.bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--sunk); margin-bottom: 12px; }
+.bar span { display: block; height: 100%; transform-origin: 0 50%; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.rows li:last-child { border-bottom: 0; }
+.rows i { width: 8px; height: 8px; border-radius: 2px; align-self: center; }
+.rows .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows small { color: var(--muted); }
+.c1 { background: var(--stay); } .c2 { background: var(--accent-fill); } .c3 { background: var(--line-2); } .c4 { background: var(--muted); }
+@media (max-width: 760px) { .rep-cols { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
+
+/* ---------- Findings ---------- */
+.findings-win { margin-top: clamp(36px, 4vw, 56px); perspective: 1800px; }
+.fw-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.f-list { list-style: none; margin: 0; padding: 10px; background: var(--sunk); border-right: 1px solid var(--line); display: grid; gap: 4px; align-content: start; }
+.f-item { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 4px 14px; padding: 14px; border-radius: 12px; text-decoration: none; color: var(--ink-2); transition: background-color .25s, box-shadow .25s, color .25s; }
+.f-item .t { font-size: 14.5px; line-height: 1.35; font-weight: 580; color: var(--ink); }
+.f-item .c { grid-column: 2; font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; color: var(--accent); }
+.f-item .c.attr { color: var(--muted); font-family: var(--sans); font-stretch: 100%; font-size: 13px; }
+@media (hover: hover) { .f-item:hover { background: color-mix(in srgb, var(--raise) 60%, transparent); } }
+.f-item[aria-current="true"] { background: var(--raise); box-shadow: 0 0 0 1px var(--line); }
+.f-item[aria-current="true"] .find-no { background: var(--accent-fill); color: #0b0c0e; }
+.f-details { padding: clamp(20px, 3vw, 36px); min-width: 0; }
+.f-detail + .f-detail { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--line); }
+html.js .f-detail { display: none; margin: 0; padding: 0; border: 0; }
+html.js .f-detail.is-open { display: block; }
+.fd-head { display: flex; gap: 14px; align-items: flex-start; }
+.fd-head h3 { font-size: clamp(18px, 1.7vw, 22px); line-height: 1.25; letter-spacing: -.014em; font-weight: 620; }
+.fast { display: inline-flex; margin-top: 10px; white-space: normal; line-height: 1.4; }
+.fd-head > div { min-width: 0; }
+.fd-shows { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; color: var(--ink-2); font-size: 14.5px; }
+.fd-shows li { padding-left: 16px; position: relative; }
+.fd-shows li::before { content: ""; position: absolute; left: 0; top: .7em; width: 6px; height: 1px; background: var(--muted); }
+.ceiling { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: var(--accent-wash); border: 1px solid color-mix(in srgb, var(--accent-fill) 35%, transparent); }
+.ceiling b { font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(18px, 1.9vw, 24px); color: var(--accent); font-weight: 520; letter-spacing: -.03em; }
+.ceiling span { color: var(--ink-2); font-size: 13.5px; }
+.ceiling.attr { background: var(--sunk); border-color: var(--line); }
+.ceiling.attr b { color: var(--ink); font-family: var(--sans); font-stretch: 100%; font-size: 15px; letter-spacing: 0; font-weight: 600; }
+.fd-next, .fd-cannot { margin-top: 16px; font-size: 14px; color: var(--ink-2); }
+.fd-next b, .fd-cannot b { display: block; color: var(--ink); font-weight: 620; margin-bottom: 2px; }
+.fd-cannot { padding-top: 14px; border-top: 1px dashed var(--line-2); }
+.devs { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 7px; position: relative; }
+.devs li { display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13px; }
+.devs .who { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.devs .track { position: relative; height: 8px; border-radius: 999px; background: var(--sunk); }
+.devs .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--stay); transform-origin: 0 50%; }
+.devs li:nth-child(-n+3) .fill { background: var(--accent-fill); }
+.devs .median { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--ink); opacity: .55; }
+.devs-note { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 900px) {
+  .fw-body { grid-template-columns: minmax(0, 1fr); }
+  .f-list { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+@media (max-width: 520px) { .devs li { grid-template-columns: minmax(0, 104px) minmax(0, 1fr) auto; gap: 8px; } }
+
+/* ---------- Cache ---------- */
+.cache-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(24px, 3.4vw, 48px); margin-top: clamp(32px, 4vw, 48px); align-items: start; }
+.meters { display: grid; gap: 12px; }
+.meter { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--raise); padding: clamp(20px, 2.2vw, 28px); }
+.meter-k { font-size: 13.5px; color: var(--muted); }
+.meter-v { display: block; margin-top: 8px; font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(40px, 4.2vw, 60px); line-height: .95; letter-spacing: -.06em; font-weight: 380; }
+.meter-l { margin-top: 10px; color: var(--ink-2); font-size: 15.5px; }
+.meter-bar { position: relative; height: 8px; border-radius: 999px; background: var(--sunk); margin-top: 16px; overflow: hidden; }
+.meter-bar span { position: absolute; inset: 0 auto 0 0; background: var(--accent-fill); border-radius: 999px; transform-origin: 0 50%; }
+.meter-sub { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+.causes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; }
+.causes-k { flex-basis: 100%; font-size: 14.5px; color: var(--ink-2); }
+.causes span.cz { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 13.5px; color: var(--ink-2); background: var(--raise); }
+.cache-claim { margin-top: 22px; font-size: clamp(18px, 1.7vw, 22px); line-height: 1.3; letter-spacing: -.016em; font-weight: 560; max-width: 44ch; }
+.cache-claim b { color: var(--accent); font-weight: 620; }
+.switch-copy { margin-bottom: 20px; }
+.switch h3 { font-size: clamp(24px, 2.4vw, 32px); line-height: 1.04; letter-spacing: -.032em; font-stretch: 108%; font-weight: 640; }
+.switch p { margin-top: 10px; color: var(--ink-2); max-width: 60ch; }
+.switch p b { color: var(--accent); font-weight: 620; }
+@media (max-width: 1023px) { .cache-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* The switch chart */
+.instrument { margin: 0; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow); overflow: hidden; }
+.inst-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; padding: 20px 24px 0; }
+.inst-title { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.inst-title span { display: block; color: var(--muted); font-weight: 440; font-size: 13.5px; margin-top: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--ink-2); }
+.legend li { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 18px; height: 3px; border-radius: 2px; background: currentColor; }
+.s-stay { color: var(--stay); }
+.s-switch { color: var(--accent-line); }
+.s-alt { color: var(--red); }
+.plot { position: relative; padding: 8px 12px 0; touch-action: pan-y; cursor: crosshair; }
+.plot svg { width: 100%; height: auto; overflow: visible; }
+.gl { stroke: var(--line); stroke-width: 1; }
+.gb { stroke: var(--line-2); stroke-width: 1; }
+.gt { fill: var(--faint); font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; }
+.series { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.series.stay { stroke: var(--stay); }
+.series.switch { stroke: var(--accent-line); stroke-width: 3; }
+.series.alt { stroke: var(--red); }
+.axis-note { fill: var(--muted); font-family: var(--sans); font-size: 12.5px; }
+.alt-note { fill: var(--red); font-family: var(--sans); font-size: 12.5px; font-weight: 560; }
+.pay-ring { fill: var(--raise); stroke: var(--accent-line); stroke-width: 2.5; }
+.pay-note { fill: var(--accent); font-family: var(--sans); font-weight: 620; font-size: 13px; }
+.guide { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 4; opacity: .5; }
+.dot { stroke: var(--raise); stroke-width: 3; }
+.dot.stay { fill: var(--stay); }
+.dot.switch { fill: var(--accent-line); }
+.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); margin-top: 6px; }
+.readout > div { padding: 14px 20px 16px; border-left: 1px solid var(--line); min-width: 0; }
+.readout > div:first-child { border-left: 0; }
+.ro-k { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.ro-k i { width: 10px; height: 3px; border-radius: 2px; background: currentColor; }
+.ro-v { display: block; margin-top: 6px; font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(17px, 1.7vw, 21px); font-weight: 460; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.scrubber { display: flex; align-items: center; gap: 16px; padding: 14px 20px 18px; border-top: 1px solid var(--line); background: var(--sunk); }
+.scrub-n { font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 11ch; }
+.scrub-n b { color: var(--ink); font-weight: 500; }
+.verdict-line { flex: 1; font-size: 14px; color: var(--ink-2); min-width: 0; }
+.verdict-line b { color: var(--accent); font-weight: 620; }
+input[type="range"].scrub { -webkit-appearance: none; appearance: none; width: clamp(120px, 20vw, 200px); height: 28px; background: transparent; cursor: ew-resize; margin: 0; }
+.scrub::-webkit-slider-runnable-track { height: 2px; background: var(--line-2); border-radius: 2px; }
+.scrub::-moz-range-track { height: 2px; background: var(--line-2); border-radius: 2px; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -8px; border-radius: 50%; background: var(--accent-fill); border: 3px solid var(--raise); box-shadow: 0 0 0 1px var(--accent-line); }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent-fill); border: 3px solid var(--raise); box-shadow: 0 0 0 1px var(--accent-line); }
+.scrub:focus-visible { outline: none; }
+.scrub:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--accent-line), 0 0 0 6px var(--accent-wash); }
+.scrub:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px var(--accent-line), 0 0 0 6px var(--accent-wash); }
+.inst-foot { padding: 12px 24px 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; border-top: 1px solid var(--line); }
+.scrub-row { display: none; }
+html.js .scrub-row { display: block; }
+@media (max-width: 560px) {
+  .inst-head { padding: 18px 16px 0; }
+  .plot { padding: 4px 2px 0; }
+  .readout > div { padding: 12px 12px 14px; }
+  .scrubber { flex-wrap: wrap; padding: 14px 16px 16px; gap: 10px 14px; }
+  .verdict-line { flex-basis: 100%; order: 3; }
+  input[type="range"].scrub { flex: 1; width: auto; }
+  .inst-foot { padding: 12px 16px 16px; }
+  .gt { font-size: 17px; }
+  .axis-note, .alt-note, .pay-note { font-size: 20px; }
+}
+
+/* ---------- Statement ---------- */
+.statement-sec { padding: 0 0 clamp(24px, 3vw, 40px); }
+.statement { font-size: clamp(30px, 4.2vw, 62px); line-height: 1; letter-spacing: -.042em; font-weight: 660; font-stretch: 114%; max-width: 26ch; }
+.statement em { font-style: normal; color: var(--accent); display: block; }
+@media (min-width: 720px) { .statement .nw { white-space: nowrap; } }
+.namesake { margin-top: 16px; max-width: 52ch; color: var(--ink-2); font-size: 16.5px; }
+
+/* ---------- Web app ---------- */
+.flow { list-style: none; margin: clamp(32px, 4vw, 48px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.flow li { padding: 18px 18px 20px 0; min-width: 0; }
+.flow li + li { padding-left: 18px; border-left: 1px solid var(--line); }
+.flow .n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-2); font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; color: var(--ink); }
+.flow li.shown .n { background: var(--accent-fill); border-color: transparent; color: #0b0c0e; }
+.flow b { display: block; margin-top: 10px; font-weight: 620; font-size: 15.5px; letter-spacing: -.01em; }
+.flow p { margin-top: 4px; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+.flow a { color: var(--ink); text-underline-offset: 3px; }
+.app-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; align-items: start; }
+.app-pair figure { margin: 0; }
+.app-pair figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); }
+@media (max-width: 1023px) {
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .flow li, .flow li + li { padding: 14px 0; border-left: 0; display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 8px; }
+  .flow li + li { border-top: 1px solid var(--line); }
+  .flow li > :not(.n) { grid-column: 2; }
+  .flow b { margin-top: 1px; }
+  .app-pair { grid-template-columns: minmax(0, 1fr); }
+}
+.checks { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.checks li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.checks li:first-child { border-top: 0; }
+.checks .i { width: 18px; height: 18px; margin-top: 1px; }
+.checks .ok .i { color: var(--ok); }
+.checks .miss { background: var(--accent-wash); }
+.checks .miss .i { color: var(--accent); }
+.checks .lab { font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; color: var(--muted); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.checks .why { display: block; margin-top: 3px; color: var(--ink-2); font-size: 12.5px; }
+.ready { margin-top: 12px; font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; align-items: center; }
+.ready .i { color: var(--ok); }
+.cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cmp div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.cmp small { display: block; color: var(--muted); font-size: 12.5px; }
+.cmp b { display: block; margin-top: 4px; font-family: var(--mono); font-stretch: 87.5%; font-weight: 440; font-size: clamp(16px, 1.5vw, 20px); letter-spacing: -.035em; }
+.delta { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); }
+.delta b { color: var(--ink); font-weight: 620; }
+.moved { margin-top: 16px; }
+.moved-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; margin-top: 6px; }
+.moved-item s { color: var(--muted); text-decoration-color: var(--line-2); }
+.moved-item .mv { display: block; margin-top: 2px; font-family: var(--mono); font-stretch: 87.5%; font-size: 12px; color: var(--accent); }
+.moved-note { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+.moved .cap { margin-top: 14px; }
+
+/* ---------- Trust ---------- */
+.trust-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: clamp(32px, 4vw, 48px); }
+.panel { border: 1px solid var(--line); border-radius: var(--r-xl); padding: clamp(22px, 2.6vw, 32px); background: var(--raise); }
+.panel h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 19px; letter-spacing: -.015em; font-stretch: 106%; }
+.panel h3 small { font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 420; }
+.panel ul { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 12px; }
+.panel li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; color: var(--ink-2); font-size: 15.5px; }
+.panel li .i { margin-top: 3px; }
+.panel.reads .i { color: var(--ok); }
+.panel.never-p .i { color: var(--red); }
+.backend-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; align-items: start; padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--line); }
+.backend-row .tile { width: 44px; height: 44px; border-radius: 12px; }
+.backend-row .tile .logo { width: 26px; height: 26px; }
+.backend-row b { display: block; font-size: 15.5px; font-weight: 620; }
+.backend-row p { margin-top: 4px; color: var(--ink-2); font-size: 14.5px; }
+.recon { margin-top: 16px; color: var(--ink-2); font-size: 15px; max-width: 80ch; }
+.recon b { color: var(--ink); font-weight: 620; }
+.facts { list-style: none; margin: clamp(28px, 3vw, 40px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.facts li { padding: 22px 20px 0 0; }
+.facts li + li { padding-left: 20px; border-left: 1px solid var(--line); }
+.facts b { display: block; font-family: var(--mono); font-stretch: 87.5%; font-weight: 380; font-size: clamp(36px, 3.8vw, 54px); letter-spacing: -.06em; line-height: .9; }
+.facts b em { font-style: normal; font-size: .4em; letter-spacing: -.02em; color: var(--muted); margin-left: .15em; }
+.facts span { display: block; margin-top: 12px; color: var(--ink-2); font-size: 14.5px; max-width: 26ch; }
+@media (max-width: 900px) {
+  .trust-grid { grid-template-columns: minmax(0, 1fr); }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 28px; }
+  .facts li:nth-child(3) { border-left: 0; padding-left: 0; }
+}
+@media (max-width: 560px) {
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .facts li { border-left: 0 !important; padding-left: 0 !important; }
+}
+
+/* ---------- Roadmap ---------- */
+.road { position: relative; margin-top: clamp(36px, 4vw, 56px); }
+.road-track { position: absolute; left: 0; right: 0; top: 15px; height: 2px; background: var(--line); border-radius: 2px; }
+.road-fill { position: absolute; left: 0; top: 15px; height: 2px; width: 42%; background: var(--accent-fill); border-radius: 2px; transform-origin: 0 50%; }
+.road ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; position: relative; }
+.node { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line-2); color: var(--muted); }
+.node .i { width: 16px; height: 16px; }
+.done .node { border-color: var(--accent-fill); color: var(--accent); }
+.now .node { background: var(--accent-fill); border-color: var(--accent-fill); color: #0b0c0e; box-shadow: 0 0 0 6px var(--accent-wash); }
+.road-state { display: inline-block; margin-top: 18px; font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.done .road-state, .now .road-state { color: var(--accent); }
+.road h3 { margin-top: 6px; font-size: 18px; line-height: 1.2; letter-spacing: -.015em; font-weight: 620; }
+.road p { margin-top: 6px; color: var(--ink-2); font-size: 14.5px; }
+.later { margin-top: 28px; color: var(--muted); font-size: 14.5px; }
+@media (max-width: 900px) {
+  .road ol { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .road ol li { display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 18px; }
+  .road ol li > :not(.node) { grid-column: 2; }
+  .road-state { margin-top: 6px; }
+  .road-track { left: 15px; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
+  .road-fill { left: 15px; top: 0; width: 2px; height: 0; transform-origin: 50% 0; }
+}
+
+/* ---------- The two-minute cache check ---------- */
+.check { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 28px clamp(24px, 4vw, 56px); align-items: start; margin-top: clamp(48px, 6vw, 80px); padding-top: clamp(32px, 4vw, 48px); border-top: 1px solid var(--line); }
+.check h3 { margin-top: 14px; font-size: clamp(24px, 2.4vw, 32px); line-height: 1.06; letter-spacing: -.032em; font-stretch: 108%; font-weight: 640; max-width: 22ch; text-wrap: balance; }
+.check h3 em { font-style: normal; color: var(--accent); }
+.check-copy p { margin-top: 12px; color: var(--ink-2); max-width: 52ch; }
+.check-copy p b { color: var(--accent); font-weight: 620; }
+.check-send a { color: var(--ink); font-weight: 580; text-underline-offset: 4px; }
+.check-win .win-bar > svg { width: 18px; height: 18px; flex: none; }
+.check-win .win-bar .chip { margin-left: auto; flex: none; }
+.check-q { margin: 0; max-height: 340px; overflow: auto; padding: 16px 18px; background: var(--sunk); border-bottom: 1px solid var(--line); font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; line-height: 1.65; color: var(--ink); }
+.check-q code { background: none; border: 0; padding: 0; white-space: pre; font: inherit; }
+.check-note { padding: 14px 18px; font-size: 13.5px; color: var(--ink-2); }
+.check-dd { border-top: 1px solid var(--line); }
+.check-dd summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; cursor: pointer; list-style: none; font-weight: 580; font-size: 14.5px; }
+.check-dd summary::-webkit-details-marker { display: none; }
+.check-dd summary .i { color: var(--muted); transition: transform .35s var(--ease); }
+.check-dd[open] summary .i { transform: rotate(180deg); }
+.check-dd-body { display: grid; gap: 10px; padding: 0 18px 18px; font-size: 14px; color: var(--ink-2); }
+.check-dd-body ol { display: grid; gap: 8px; padding-left: 20px; }
+.check-dd-body code { white-space: normal; }
+.check-formula { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.check-formula code { font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; }
+.founding { margin-top: 16px; padding: 12px 16px; border-left: 3px solid var(--accent-fill); background: var(--accent-wash); border-radius: 0 var(--r-md) var(--r-md) 0; color: var(--ink); max-width: 58ch; }
+.founding b { color: var(--accent); font-weight: 640; }
+@media (max-width: 900px) { .check { grid-template-columns: minmax(0, 1fr); } }
+
+.install-line .addr { font-size: 14px; }
+.install-line + .install-line { margin-top: 8px; }
+.flow code { background: none; border: 0; padding: 0; font-family: var(--mono); font-stretch: 87.5%; font-size: .92em; }
+
+/* ---------- FAQ ---------- */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 24px 64px; }
+.faq-list { border-top: 1px solid var(--line); }
+.faq-list details { border-bottom: 1px solid var(--line); }
+.faq-list summary { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; cursor: pointer; list-style: none; font-size: clamp(16.5px, 1.4vw, 18.5px); font-weight: 580; letter-spacing: -.01em; }
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary .i { color: var(--muted); transition: transform .35s var(--ease); }
+.faq-list details[open] summary .i { transform: rotate(180deg); }
+@media (hover: hover) { .faq-list summary:hover { color: var(--accent); } }
+.faq-a { padding: 0 0 20px; color: var(--ink-2); max-width: 64ch; display: grid; gap: 10px; font-size: 16px; }
+@media (max-width: 900px) { .faq-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Pilot ---------- */
+.pilot { padding-bottom: clamp(64px, 8vw, 112px); }
+.pilot-card { border: 1px solid var(--line); border-radius: calc(var(--r-xl) + 6px); background: var(--raise); box-shadow: var(--shadow); overflow: hidden; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.pilot-main { padding: clamp(28px, 4.4vw, 64px); }
+.pilot-main .h2 { max-width: 15ch; }
+.pilot-main .intro b { color: var(--ink); font-weight: 620; }
+.qual { margin-top: clamp(28px, 3vw, 40px); padding-top: 22px; border-top: 1px solid var(--line); display: grid; gap: 12px; color: var(--ink-2); font-size: 15px; max-width: 60ch; }
+.qual b { color: var(--ink); font-weight: 620; }
+.how { background: var(--sunk); border-left: 1px solid var(--line); padding: clamp(28px, 3.6vw, 52px); }
+.how h3 { font-size: 18px; letter-spacing: -.01em; }
+.how ol { list-style: none; margin: 20px 0 0; padding: 0; counter-reset: how; }
+.how li { counter-increment: how; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); font-size: 14.5px; color: var(--ink-2); }
+.how li::before { content: counter(how); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line-2); font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; color: var(--ink); }
+.how li b { display: block; color: var(--ink); font-weight: 600; }
+.how li.opt::before { border-style: dashed; }
+@media (max-width: 960px) {
+  .pilot-card { grid-template-columns: minmax(0, 1fr); }
+  .how { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* ---------- Footer ---------- */
+.foot { border-top: 1px solid var(--line); padding: clamp(40px, 5vw, 56px) 0 36px; }
+.foot-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px 48px; }
+.foot-line { margin-top: 12px; color: var(--muted); max-width: 44ch; font-size: 15px; }
+.foot-links { display: grid; gap: 8px; font-size: 15px; }
+.foot-links a { color: var(--ink-2); text-underline-offset: 4px; text-decoration-color: var(--line-2); }
+.foot-bottom { margin-top: 36px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; color: var(--muted); font-size: 13.5px; }
+.foot-bottom a { color: inherit; }
+
+/* Reduced motion: final states, no transitions that travel. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+{{chart:sprite}}
+<div class="frame" aria-hidden="true"></div>
+
+<header class="nav" data-nav>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="mycroftcompute, back to top">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+      mycroftcompute
+    </a>
+    <nav class="nav-links" aria-label="Page">
+      <a href="#findings">What it finds</a>
+      <a href="#cache">The cache</a>
+      <a href="#app">The command</a>
+      <a href="#install">Install</a>
+    </nav>
+    <div class="nav-end">
+      <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Switch colour theme">
+        <span class="sun">{{icon:sun-2-linear}}</span><span class="moon">{{icon:moon-linear}}</span>
+      </button>
+      <details class="menu" data-menu>
+        <summary class="icon-btn" aria-label="Menu">{{icon:alt-arrow-down-linear}}</summary>
+        <nav class="menu-panel" aria-label="Page">
+          <a href="#findings">What it finds</a>
+          <a href="#cache">The cache</a>
+          <a href="#app">The command</a>
+          <a href="#install">Install</a>
+          <a href="#faq">Questions</a>
+        </nav>
+      </details>
+      <a class="btn btn-sm" href="https://github.com/negi6711/mycroftcompute" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ Hero ============ -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <p class="status"><span class="pulse" aria-hidden="true"></span><span><b>Open source</b> command-line tool. MIT licensed.</span></p>
+    <h1 class="h1" data-split data-hero>Where your Claude Code money goes, <span class="soft">and what’s worth changing.</span></h1>
+
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="lede">A command-line tool that reads your Claude Code history, or your team’s Grafana or Datadog telemetry, prices every token <strong>with the prompt cache counted</strong>, and prints a plain report: where the money went, which changes are worth making, and what the data cannot tell you.</p>
+        <p class="mail-alt install-line">
+          <span class="addr">uvx mycroftcompute</span>
+          <button class="chip" type="button" data-copy="uvx mycroftcompute" data-copy-said="Command copied">{{icon:copy-linear}}<span>Copy</span></button>
+        </p>
+        <div class="ctas">
+          <a class="btn" href="https://github.com/negi6711/mycroftcompute" rel="noopener">View on GitHub {{icon:arrow-right-up-linear}}</a>
+          <a class="link" href="#findings"><span>See what it finds</span></a>
+        </div>
+        <p class="readonly">{{icon:shield-check-linear}}<span>Runs on your machine and uploads nothing. Python 3.12 or later, no dependencies.</span></p>
+        <div class="works">
+          <span class="works-label">Works with</span>
+          <ul>
+            <li><span class="tile">{{icon:document-text-linear}}</span>Claude Code history</li>
+            <li><span class="tile">{{logo:grafana}}</span>Grafana Cloud</li>
+            <li><span class="tile">{{logo:datadog}}</span>Datadog</li>
+          </ul>
+        </div>
+      </div>
+
+      <figure class="win hero-win" data-hero-win aria-label="A mycroftcompute report for a sample team: where its Claude Code money went in August 2026" style="margin:0">
+        <div class="win-bar">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+          <span class="crumb"><b>Sample team</b> / Reports / 1 to 28 Aug 2026</span>
+          <span class="tag">Sample</span>
+        </div>
+        <div class="pane">
+          <div class="rep-top">
+            <div>
+              <p class="rep-title">Anthropic usage, 1 to 28 August 2026</p>
+              <p class="rep-total">$15,365.62<small>at list prices</small></p>
+            </div>
+            <div class="rep-meta"><span class="meta-pill">24 developers</span><span class="meta-pill">4 findings</span></div>
+          </div>
+          <div class="rep-cols">
+            <div data-reveal-hero>
+              <p class="cap">By model</p>
+              <div class="bar" aria-hidden="true"><span class="c2" style="width:87.2%" data-bar></span><span class="c1" style="width:12.8%" data-bar></span></div>
+              <ul class="rows">
+                <li><i class="c2"></i><span class="who">claude-opus-5</span><span class="num">$13,398.84</span></li>
+                <li><i class="c1"></i><span class="who">claude-sonnet-5</span><span class="num">$1,966.78</span></li>
+              </ul>
+            </div>
+            <div data-reveal-hero>
+              <p class="cap">By request kind</p>
+              <div class="bar" aria-hidden="true"><span class="c1" style="width:75.7%" data-bar></span><span class="c3" style="width:12.8%" data-bar></span><span class="c2" style="width:11.5%" data-bar></span></div>
+              <ul class="rows">
+                <li><i class="c1"></i><span class="who">main</span><span class="num">$11,631.10</span></li>
+                <li><i class="c3"></i><span class="who">subagent</span><span class="num">$1,966.78</span></li>
+                <li><i class="c2"></i><span class="who">auxiliary <small>housekeeping</small></span><span class="num">$1,767.74</span></li>
+              </ul>
+            </div>
+            <div data-reveal-hero>
+              <p class="cap">By developer</p>
+              <div class="bar" aria-hidden="true"><span class="c2" style="width:14.1%" data-bar></span><span class="c2" style="width:13.7%" data-bar></span><span class="c2" style="width:11.7%" data-bar></span><span class="c3" style="width:60.5%" data-bar></span></div>
+              <ul class="rows">
+                <li><i class="c2"></i><span class="who">priya@example.com</span><span class="num">$2,168.54</span></li>
+                <li><i class="c2"></i><span class="who">marco@example.com</span><span class="num">$2,106.58</span></li>
+                <li><i class="c2"></i><span class="who">sven@example.com</span><span class="num">$1,796.79</span></li>
+                <li><i class="c3"></i><span class="who">21 more <small>median $464.69</small></span><span class="num dim"></span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="win-foot">
+          <span>Four findings. The largest ceiling is <b>at most $5,884.62</b> over the month.</span>
+          <a href="#findings">Read the findings</a>
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ What a report finds ============ -->
+<section class="section" id="findings" aria-labelledby="findings-h" style="padding-top:0">
+  <div class="wrap">
+    <p class="label"><b>01</b>What a report finds</p>
+    <div class="head-row">
+      <h2 class="h2" id="findings-h" data-split>Four findings on a $15,365.62 month.</h2>
+      <p class="intro" data-reveal>Each dollar figure is the most a change could be worth, never a promise. The ceilings overlap, so they are never added up. Every finding ends with what your data cannot tell you.</p>
+    </div>
+
+    <div class="findings-win">
+      <div class="win" data-findings-win>
+        <div class="win-bar">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+          <span class="crumb"><b>Sample team</b> / 1 to 28 Aug 2026 / Findings</span>
+          <span class="tag">Sample</span>
+        </div>
+        <div class="fw-body" data-findings>
+          <ol class="f-list" aria-label="Findings in this report">
+            <li><a class="f-item" href="#f-1" data-f="1"><span class="find-no">1</span><span class="t">39.5% of agent spend went to three developers</span><span class="c attr">Attribution, not a lever</span></a></li>
+            <li><a class="f-item" href="#f-2" data-f="2" aria-current="true"><span class="find-no">2</span><span class="t">11.5% of spend is the agent’s own housekeeping, on claude-opus-5</span><span class="c">At most $942.80</span></a></li>
+            <li><a class="f-item" href="#f-3" data-f="3"><span class="find-no">3</span><span class="t">Moving claude-opus-5 to claude-haiku-4-5 would pay off, but not immediately</span><span class="c">At most $5,884.62</span></a></li>
+            <li><a class="f-item" href="#f-4" data-f="4"><span class="find-no">4</span><span class="t">26.6% of your bill went on writing the prompt cache</span><span class="c">At most $3,764.64</span></a></li>
+          </ol>
+          <div class="f-details">
+            <article class="f-detail is-open" id="f-2" data-fd="2">
+              <div class="fd-head"><span class="find-no">2</span><div><h3>11.5% of spend is the agent’s own housekeeping, on claude-opus-5</h3><span class="tag fast">Fastest to act on: one settings change</span></div></div>
+              <ul class="fd-shows">
+                <li>$1,767.74 of $15,365.62, 11.5%, went to requests the agent raised for itself or marked as needing low effort.</li>
+                <li>No cache on claude-opus-5 for this traffic, so moving it to claude-haiku-4-5 costs nothing to switch.</li>
+              </ul>
+              <div class="ceiling"><b>At most $942.80</b><span>over this period. A ceiling, not a saving.</span></div>
+              <p class="fd-next"><b>Next</b>Check what model your agent uses for auxiliary and low-effort requests. If it is claude-opus-5, point it at claude-haiku-4-5 and leave the main path alone.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>Whether your agent lets you choose a model for this traffic separately from the main one.</p>
+            </article>
+            <article class="f-detail" id="f-1" data-fd="1">
+              <div class="fd-head"><span class="find-no">1</span><div><h3>39.5% of agent spend went to three developers</h3></div></div>
+              <ul class="fd-shows">
+                <li>24 developers ran agents in this period, for $15,365.62 in total. The top three account for $6,071.90, 39.5% of everything.</li>
+              </ul>
+              <ul class="devs" aria-label="Spend by developer">
+                <li><span class="who">priya@example.com</span><span class="track"><span class="fill" style="width:100%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$2,168.54</span></li>
+                <li><span class="who">marco@example.com</span><span class="track"><span class="fill" style="width:97.1%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$2,106.58</span></li>
+                <li><span class="who">sven@example.com</span><span class="track"><span class="fill" style="width:82.9%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$1,796.79</span></li>
+                <li><span class="who">ana@example.com</span><span class="track"><span class="fill" style="width:31%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$671.21</span></li>
+                <li><span class="who">ben@example.com</span><span class="track"><span class="fill" style="width:28.6%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$619.58</span></li>
+              </ul>
+              <p class="devs-note">The vertical line is the team median, $464.69.</p>
+              <div class="ceiling attr"><b>Attribution, not a lever</b><span>This finding says where the money went, not that it went somewhere wrong.</span></div>
+              <p class="fd-next"><b>Next</b>Ask priya@example.com what they have been running agents on. The useful outcome is usually a technique worth spreading rather than a habit worth stopping.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>Whether any of this is a problem. Spend follows work, and the most expensive developer on a team is frequently the most productive one.</p>
+            </article>
+            <article class="f-detail" id="f-3" data-fd="3">
+              <div class="fd-head"><span class="find-no">3</span><div><h3>Moving claude-opus-5 to claude-haiku-4-5 would pay off, but not immediately</h3></div></div>
+              <ul class="fd-shows">
+                <li>claude-opus-5 is 87.2% of spend, $13,398.84.</li>
+                <li>Once each session’s cache is warm on claude-haiku-4-5, the same tokens would cost $5,884.62 less over this period. The first request of every session that moves pays to write its cache again, and daily totals do not count sessions, so that cost is not subtracted here.</li>
+              </ul>
+              <div class="ceiling"><b>At most $5,884.62</b><span>over this period. A ceiling, not a saving.</span></div>
+              <p class="fd-next"><b>Next</b>Try the cheaper model in one repository for a week before changing anything broadly. Routing at session boundaries preserves the cache; switching mid-session destroys it and costs more than it saves.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>Whether the cheaper model would do the work. This compares what the same tokens would cost; it is not a judgement about output quality.</p>
+            </article>
+            <article class="f-detail" id="f-4" data-fd="4">
+              <div class="fd-head"><span class="find-no">4</span><div><h3>26.6% of your bill went on writing the prompt cache</h3></div></div>
+              <ul class="fd-shows">
+                <li>811,852,800 tokens were written to the prompt cache, costing $4,092.00 at the five-minute write rate. At the one-hour rate the same writes would cost $6,547.20.</li>
+                <li>15,713,280,000 tokens were read back from cache, about 19.4 reads for every token written.</li>
+              </ul>
+              <div class="ceiling"><b>At most $3,764.64</b><span>over this period. A ceiling, not a saving.</span></div>
+              <p class="fd-next"><b>Next</b>Look for what rewrites a warm prefix: sessions restarted or cleared often, tools or MCP servers that change mid-session, model switches inside a session, and long pauses.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>How many of these writes were a warm prefix written again and how many were new context that had to be written once. Only the first kind can be avoided.</p>
+            </article>
+          </div>
+        </div>
+        <div class="win-foot">
+          <span class="price-note">{{icon:check-circle-linear}}Prices checked against each vendor’s own pricing page on 24 Sep 2026.</span>
+          <span>Did not run: repository concentration. Claude Code does not emit a repository label.</span>
+        </div>
+      </div>
+      <p class="sample-note">Sample report for an invented team. The arithmetic is real.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ The cache ============ -->
+<section class="section" id="cache" aria-labelledby="cache-h">
+  <div class="wrap">
+    <p class="label"><b>02</b>The prompt cache</p>
+    <div class="head-row">
+      <h2 class="h2" id="cache-h" data-split>On Claude Code, the cache money is in the writes.</h2>
+      <p class="intro" data-reveal>The cache already works, so “turn caching on” is not the saving. Writing it is what costs: every write is billed above list price, 1.25x for five minutes and 2x for an hour.</p>
+    </div>
+
+    <div class="cache-grid">
+    <div>
+    <div class="meters">
+      <div class="meter" data-reveal>
+        <p class="meter-k">On the author’s own Claude Code usage</p>
+        <b class="meter-v">40.7%</b>
+        <p class="meter-l">of the bill went on writing the cache, at the five-minute rate, while about 96% of input was read from cache.</p>
+        <div class="meter-bar" aria-hidden="true"><span style="width:40.7%" data-bar></span></div>
+        <p class="meter-sub">One developer over two days, read live from Grafana Cloud, 24 and 25 September 2026.</p>
+      </div>
+      <div class="meter" data-reveal>
+        <p class="meter-k">In the sample team</p>
+        <b class="meter-v">26.6%</b>
+        <p class="meter-l">of the bill: $4,092.00 at the five-minute rate, $6,547.20 at the one-hour rate.</p>
+        <div class="meter-bar" aria-hidden="true"><span style="width:26.6%" data-bar></span></div>
+        <p class="meter-sub">Finding 4 above, at most $3,764.64 over the month.</p>
+      </div>
+    </div>
+
+    <div class="causes" data-reveal>
+      <span class="causes-k">A warm cache gets rewritten by</span>
+      <span class="cz">new sessions</span><span class="cz">compactions</span><span class="cz">model switches</span><span class="cz">tools or MCP servers changing mid-session</span><span class="cz">long pauses</span>
+    </div>
+    <p class="cache-claim" data-reveal>Mycroft shows what share of your bill went on <b>writing the cache</b>, and the most that fewer rewrites could be worth.</p>
+    </div>
+
+    <div class="switch">
+      <div class="switch-copy">
+        <h3 data-split>The cheaper model isn’t always cheaper.</h3>
+        <p data-reveal>A model switch is one of those rewrites. On a typical agent step the cheaper model costs 3.9x more on the first request, pays back by the sixth, and is 9.4x worse if you keep switching. Every router and dashboard compares list prices; <b>Mycroft counts the cache</b> before it suggests any model change.</p>
+      </div>
+
+      <figure class="instrument" data-instrument {{chart:data}}>
+        <div class="inst-head">
+          <p class="inst-title">Moving a coding agent from Sonnet 4.6 to Haiku 4.5<span>Cumulative input cost, requests after the switch</span></p>
+          <ul class="legend" aria-hidden="true">
+            <li class="s-stay"><i></i>Stay on Sonnet 4.6</li>
+            <li class="s-switch"><i></i>Switch to Haiku 4.5</li>
+            <li class="s-alt"><i></i>Alternate every request</li>
+          </ul>
+        </div>
+        <div class="plot" data-plot>
+          <svg viewBox="0 0 720 400" role="img" aria-labelledby="chart-t chart-d">
+            <title id="chart-t">Cumulative input cost over ten requests after a model switch</title>
+            <desc id="chart-d">Staying on Sonnet 4.6 costs $0.045 per request. Switching to Haiku 4.5 costs $0.177 on the first request, 3.9 times more, then $0.015 per request, so it pulls ahead on request 6 and reaches $0.313 by request 10 against $0.453 for staying. Alternating costs $0.426 every request and reaches $4.260 by request 10, far off this scale.</desc>
+            <defs>
+              <clipPath id="plot-clip"><rect x="40" y="0" width="680" height="360"/></clipPath>
+            </defs>
+            <g aria-hidden="true">
+              {{chart:grid}}
+              {{chart:base}}
+              <text class="axis-note" x="696" y="398" text-anchor="end">requests after the switch</text>
+              <g clip-path="url(#plot-clip)">
+                <path class="series alt" d="{{chart:alt}}" data-line/>
+                <path class="series stay" d="{{chart:stay}}" data-line/>
+                <path class="series switch" d="{{chart:switch}}" data-line/>
+              </g>
+              <g data-alt-note>
+                <path d="M{{chart:alt-x}} {{chart:alt-y}} l-5 9 m5 -9 l6 7" stroke="currentColor" class="s-alt" fill="none" stroke-width="2" stroke-linecap="round"/>
+                <text class="alt-note" x="150" y="30">Alternating: $4.26 by request 10, off this scale</text>
+              </g>
+              <g data-pay>
+                <circle class="pay-ring" cx="{{chart:pay-x}}" cy="{{chart:pay-y}}" r="5.5"/>
+                <text class="pay-note" x="{{chart:pay-x}}" y="{{chart:pay-y}}" dx="0" dy="34" text-anchor="middle">Ahead from request 6</text>
+              </g>
+              <g data-guide>
+                <line class="guide" x1="{{chart:guide-x}}" x2="{{chart:guide-x}}" y1="40" y2="352"/>
+                <circle class="dot stay" cx="{{chart:guide-x}}" cy="{{chart:stay-y}}" r="6"/>
+                <circle class="dot switch" cx="{{chart:guide-x}}" cy="{{chart:switch-y}}" r="6"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="readout" aria-hidden="true">
+          <div class="s-stay"><span class="ro-k"><i></i>Stay</span><span class="ro-v" data-ro="stay">$0.272</span></div>
+          <div class="s-switch"><span class="ro-k"><i></i>Switch</span><span class="ro-v" data-ro="switch">$0.253</span></div>
+          <div class="s-alt"><span class="ro-k"><i></i>Alternate</span><span class="ro-v" data-ro="alt">$2.556</span></div>
+        </div>
+        <div class="scrubber">
+          <span class="scrub-n" aria-hidden="true">Request <b data-ro="n">6</b> of 10</span>
+          <p class="verdict-line" data-ro="verdict">Switching is <b>ahead by $0.019</b>. It overtook staying on request 6.</p>
+          <label class="sr-only" for="scrub">Requests after the switch</label>
+          <input class="scrub scrub-row" id="scrub" type="range" min="1" max="10" step="1" value="6" data-scrub>
+        </div>
+        <figcaption class="inst-foot">One coding-agent step at list prices: about 141,000 cached prompt tokens and 1,000 fresh ones, from published coding-agent workload research. Five-minute cache.</figcaption>
+      </figure>
+    </div>
+    </div>
+
+    <div class="check" id="check">
+      <div class="check-copy" data-reveal>
+        <span class="tag">Free, two minutes</span>
+        <h3>What share of <em>your</em> bill went on writing the cache?</h3>
+        <p>One query, run in your own Grafana or Datadog, with nothing to install. It prices every token the way <code>mycroftcompute</code> does, so the answer is a share of dollars, not of tokens.</p>
+        <p>On the author’s own Claude Code usage it reads <b>37%</b> at the five-minute rate and <b>48%</b> at the one-hour rate, over 14 days. Cache writes are 3% of those tokens.</p>
+        <p class="check-send">What the number means, and what it could be worth: <a href="https://github.com/negi6711/mycroftcompute/blob/main/docs/cache-check.md" rel="noopener">docs/cache-check.md</a></p>
+      </div>
+      <figure class="win check-win" data-reveal style="margin:0">
+        <div class="win-bar">
+          {{logo:grafana}}
+          <span class="crumb"><b>Grafana</b> / Explore / Code / Instant</span>
+          <button class="chip" type="button" data-copy="" data-copy-from="q-grafana" data-copy-said="Query copied">{{icon:copy-linear}}<span>Copy query</span></button>
+        </div>
+        <pre class="check-q"><code id="q-grafana">100 *
+sum(
+  sum by (model) (last_over_time(claude_code_cost_usage_USD_total[14d]))
+  *
+  (
+    1.25 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheCreation"}[14d]))
+    /
+    (
+        sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="input"}[14d]))
+      + 1.25 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheCreation"}[14d]))
+      + 5 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="output"}[14d]))
+      + (
+            0.05 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheRead", model=~".*claude-opus-5-5.*"}[14d]))
+         or 0.025 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheRead", model=~".*claude-fable-5-1.*"}[14d]))
+         or 0.1 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheRead"}[14d]))
+        )
+    )
+  )
+)
+/
+sum(
+  sum by (model) (last_over_time(claude_code_cost_usage_USD_total[14d]))
+  and on (model)
+  sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheCreation"}[14d]))
+)</code></pre>
+        <p class="check-note">The result is a percentage at the five-minute write rate. For the one-hour rate, change both <code>1.25</code> to <code>2</code>. Claude Code writes mostly at the one-hour rate, so the true share is between the two.</p>
+        <details class="check-dd">
+          <summary>On Datadog instead{{icon:alt-arrow-down-linear}}</summary>
+          <div class="check-dd-body">
+            <ol>
+              <li>New dashboard, then a <b>Query Value</b> widget, time frame <b>Past 2 Weeks</b>.</li>
+              <li>Four queries on <code>claude_code.token.usage</code>, each <code>sum</code>, as count, <b>Take the sum</b>: <b>a</b> <code>type:cachecreation</code>, <b>b</b> <code>type:input</code>, <b>c</b> <code>type:cacheread</code>, <b>d</b> <code>type:output</code>.</li>
+              <li>Hide them and add this formula:</li>
+            </ol>
+            <p class="check-formula"><code id="q-datadog">100 * 1.25 * a / (b + 1.25 * a + 0.1 * c + 5 * d)</code><button class="chip" type="button" data-copy="" data-copy-from="q-datadog" data-copy-said="Formula copied">{{icon:copy-linear}}<span>Copy</span></button></p>
+            <p>Mostly on Claude Opus 5.5? Change <code>0.1</code> to <code>0.05</code> (Fable 5.1: <code>0.025</code>). For the one-hour rate, change both <code>1.25</code> to <code>2</code>.</p>
+          </div>
+        </details>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Statement ============ -->
+<section class="statement-sec" aria-label="What mycroftcompute does differently">
+  <div class="wrap">
+    <p class="statement" data-scrub-words>Everybody in this market <span class="nw">collects and displays.</span> <em>Mycroft judges.</em></p>
+    <p class="namesake" data-reveal>Named after Mycroft Holmes, Sherlock’s cleverer brother, who never gathered the evidence himself. He worked out what it meant.</p>
+  </div>
+</section>
+
+<!-- ============ The command ============ -->
+<section class="section" id="app" aria-labelledby="app-h">
+  <div class="wrap">
+    <p class="label"><b>03</b>The command</p>
+    <div class="head-row">
+      <h2 class="h2" id="app-h" data-split>No dashboard. A report, in your terminal.</h2>
+      <p class="intro" data-reveal>No chart walls and no live tiles: one plain report, and a few flags around it. Run it on your own history in seconds, or point it at a team’s Grafana or Datadog.</p>
+    </div>
+
+    <ol class="flow" data-reveal>
+      <li><span class="n">1</span><b><code>mycroftcompute</code></b><p>Your own Claude Code history, read where it lies. Nothing is uploaded.</p></li>
+      <li class="shown"><span class="n">2</span><b><code>--discover</code></b><p>For a team backend: the labels its telemetry carries, before any usage is read.</p></li>
+      <li><span class="n">3</span><b>The report</b><p>Where the money went, then the findings. <a href="#findings">Shown above.</a></p></li>
+      <li class="shown"><span class="n">4</span><b><code>--db history.db</code></b><p>The next run opens with what moved since last time.</p></li>
+      <li><span class="n">5</span><b><code>--sample</code></b><p>An invented 24-developer team, to see the report before running it on your own.</p></li>
+    </ol>
+
+    <div class="app-pair">
+      <figure data-reveal>
+        <div class="win" role="img" aria-label="Output of --discover: eight telemetry labels, seven found and one missing, with what the missing repository label costs.">
+          <div class="win-bar"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg><span class="crumb"><b>--discover</b> / No usage read yet</span><span class="tag">Output</span></div>
+          <div class="pane">
+            <ul class="checks" data-checks>
+              <li class="ok">{{icon:check-circle-linear}}<span>Token counts</span><span class="lab">claude_code.token.usage</span></li>
+              <li class="ok">{{icon:check-circle-linear}}<span>Input/output split</span><span class="lab">type</span></li>
+              <li class="ok">{{icon:check-circle-linear}}<span>Model names</span><span class="lab">model</span></li>
+              <li class="ok">{{icon:check-circle-linear}}<span>Cache split</span><span class="lab">cacheRead, cacheCreation</span></li>
+              <li class="ok">{{icon:check-circle-linear}}<span>Developer identity</span><span class="lab">user.email</span></li>
+              <li class="miss">{{icon:danger-circle-linear}}<span>Repository <span class="why">Not found. Spend cannot be attached to a codebase, so “is this where our work is meant to be?” goes unanswered.</span></span><span class="lab">missing</span></li>
+              <li class="ok">{{icon:check-circle-linear}}<span>Request segments</span><span class="lab">query_source, effort</span></li>
+              <li class="ok">{{icon:check-circle-linear}}<span>Reported cost</span><span class="lab">claude_code.cost.usage</span></li>
+            </ul>
+            <p class="ready">{{icon:check-circle-linear}}Ready. Some findings will be unavailable: Repository.</p>
+          </div>
+        </div>
+        <figcaption>Seconds after pointing it at a backend. A gap becomes a stated limit, not a silent error.</figcaption>
+      </figure>
+
+      <figure data-reveal>
+        <div class="win" role="img" aria-label="Output of a second run with --db: $12,928.43 against $15,365.62, $2,437.20 less; the housekeeping finding stopped firing and two ceilings moved down.">
+          <div class="win-bar"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg><span class="crumb"><b>Since last time</b> / 29 Aug to 25 Sep against 1 to 28 Aug</span><span class="tag">Output</span></div>
+          <div class="pane">
+            <div class="cmp">
+              <div><small>29 Aug to 25 Sep</small><b>$12,928.43</b></div>
+              <div><small>1 to 28 Aug</small><b>$15,365.62</b></div>
+            </div>
+            <p class="delta"><b>$2,437.20 less, 16%.</b> Both windows are 28 days.</p>
+            <div class="moved">
+              <p class="cap">No longer firing</p>
+              <div class="moved-item"><s>11.5% of spend is the agent’s own housekeeping, on claude-opus-5</s></div>
+              <p class="cap">Still open, and the ceiling moved</p>
+              <div class="moved-item"><span>23.7% of your bill went on writing the prompt cache<span class="mv">$3,764.64 down to $2,823.48</span></span></div>
+              <div class="moved-item"><span>Moving claude-opus-5 to claude-haiku-4-5 would pay off, but not immediately<span class="mv">$5,884.62 down to $4,886.83</span></span></div>
+              <p class="moved-note">A finding that stopped firing is a finding that stopped firing. We cannot tell whether anything you did caused it, and we are not going to claim it did.</p>
+            </div>
+          </div>
+        </div>
+        <figcaption>Equal windows, compared. It never calls a shorter month a saving.</figcaption>
+      </figure>
+    </div>
+    <p class="sample-note">Sample report for an invented team. The arithmetic is real.</p>
+  </div>
+</section>
+
+<!-- ============ Trust ============ -->
+<section class="section" id="trust" aria-labelledby="trust-h">
+  <div class="wrap">
+    <p class="label"><b>04</b>What it reads</p>
+    <div class="head-row">
+      <h2 class="h2" id="trust-h" data-split>It reads daily totals. Nothing it could change.</h2>
+      <p class="intro" data-reveal>Checked end to end against real Claude Code data, locally and on both backends, in September 2026.</p>
+    </div>
+
+    <div class="trust-grid">
+      <div class="panel reads" data-reveal>
+        <h3>Reads <small>Locally, or read-only from a backend</small></h3>
+        <ul>
+          <li>{{icon:check-circle-linear}}<span>Your own Claude Code session files in <code>~/.claude/projects</code>, on your machine. Only each message’s token counts, model, date and project are kept.</span></li>
+          <li>{{icon:check-circle-linear}}<span>Or a team backend, as daily totals: token counts by model and type, and the labels <code>user.email</code>, <code>query_source</code>, <code>effort</code>.</span></li>
+          <li>{{icon:check-circle-linear}}<span>The backend’s own cost figure, to reconcile against.</span></li>
+        </ul>
+        <div class="backend-row"><span class="tile">{{logo:grafana}}</span><div><b>Grafana Cloud, or any Prometheus-compatible backend</b><p>Cloud Access Policy token, <code>metrics:read</code> on one stack. Live-verified, Sep 2026.</p></div></div>
+        <div class="backend-row"><span class="tile">{{logo:datadog}}</span><div><b>Datadog, every site</b><p>API key plus an Application key, <code>metrics_read</code> and <code>timeseries_query</code>. Live-verified, Sep 2026.</p></div></div>
+      </div>
+      <div class="panel never-p" data-reveal>
+        <h3>Never <small>Not sent, not stored</small></h3>
+        <ul>
+          <li>{{icon:eye-closed-linear}}<span>Sends anything anywhere. No account, no telemetry, and no network calls except to a backend you name.</span></li>
+          <li>{{icon:eye-closed-linear}}<span>Stores or prints prompts, responses or code. From a backend it never reads them, or logs and traces.</span></li>
+          <li>{{icon:lock-keyhole-minimalistic-linear}}<span>Changes anything.</span></li>
+        </ul>
+        <p class="recon"><b>Stored only if you ask:</b> <code>--db</code> keeps daily totals and findings in a local file, so the next run can compare.</p>
+        <p class="recon"><b>Reconciles against your backend’s own number.</b> Where they differ, the report says why. Usually it is one-hour cache writes, which the metrics do not label.</p>
+      </div>
+    </div>
+
+    <ul class="facts" data-reveal-group>
+      <li data-reveal><b>19</b><span>models priced, from Anthropic, OpenAI and Google, with cache multipliers and minimums</span></li>
+      <li data-reveal><b>31<em>days</em></b><span>after the last price check, the report flags its prices as old</span></li>
+      <li data-reveal><b>0</b><span>dependencies: Python’s standard library only</span></li>
+      <li data-reveal><b>0</b><span>bytes uploaded, from your machine or your backend</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ Install ============ -->
+<section class="section pilot" id="install" aria-labelledby="install-h">
+  <div class="wrap">
+    <div class="pilot-card">
+      <div class="pilot-main">
+        <p class="label"><b>05</b>Install</p>
+        <h2 class="h2" id="install-h" data-split>One command. Nothing to sign up for.</h2>
+        <p class="intro" data-reveal>Run it once with <code>uvx</code>, or keep it installed with <code>pipx</code>. Python 3.12 or later; no dependencies.</p>
+        <p class="mail-alt install-line" data-reveal>
+          <span class="addr">uvx mycroftcompute</span>
+          <button class="chip" type="button" data-copy="uvx mycroftcompute" data-copy-said="Command copied">{{icon:copy-linear}}<span>Copy</span></button>
+        </p>
+        <p class="mail-alt install-line" data-reveal>
+          <span class="addr">pipx install mycroftcompute</span>
+          <button class="chip" type="button" data-copy="pipx install mycroftcompute" data-copy-said="Command copied">{{icon:copy-linear}}<span>Copy</span></button>
+        </p>
+        <div class="ctas" data-reveal>
+          <a class="btn" href="https://github.com/negi6711/mycroftcompute" rel="noopener">View on GitHub {{icon:arrow-right-up-linear}}</a>
+        </div>
+        <div class="qual" data-reveal>
+          <p><b>A personal project.</b> MIT licensed. It began as the engine of a product for platform teams and is kept as a tool. Prices are checked by hand, and the report says when they have aged.</p>
+        </div>
+      </div>
+      <div class="how">
+        <h3>Reading a team’s backend</h3>
+        <ol>
+          <li data-reveal><span><b>Send Claude Code’s telemetry.</b>A few settings, deployable to the whole team through Claude Code’s managed settings. Grafana needs cumulative counters; Datadog drops them.</span></li>
+          <li data-reveal><span><b>Create one read-only credential.</b>Grafana: <code>metrics:read</code> on one stack. Datadog: <code>metrics_read</code> and <code>timeseries_query</code>.</span></li>
+          <li data-reveal><span><b>Run <code>--discover</code>.</b>What the telemetry can and cannot support, before any usage is read.</span></li>
+          <li data-reveal><span><b>Read two weeks.</b><code>--days 14 --db team.db</code>, and run it again next month for what moved.</span></li>
+          <li class="opt" data-reveal><span><b>Step by step.</b><a href="https://github.com/negi6711/mycroftcompute/blob/main/docs/team-backends.md" rel="noopener">docs/team-backends.md</a>, including the two settings that silently lose every number.</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section" id="faq" aria-labelledby="faq-h" style="padding-top:0">
+  <div class="wrap faq-grid">
+    <div>
+      <p class="label"><b>06</b>Questions</p>
+      <h2 class="h2" id="faq-h" data-split>Questions.</h2>
+    </div>
+    <div class="faq-list">
+      <details>
+        <summary>What exactly does it read?{{icon:alt-arrow-down-linear}}</summary>
+        <div class="faq-a"><p>Locally, Claude Code’s own session files in <code>~/.claude/projects</code> (or <code>$CLAUDE_CONFIG_DIR/projects</code>). It keeps each message’s token counts, model, date and project, and nothing else. From a team backend, daily totals of <code>claude_code.token.usage</code> and <code>claude_code.cost.usage</code> with their labels for model, token type, developer, request kind and effort. It never stores or prints prompts, responses or code.</p></div>
+      </details>
+      <details>
+        <summary>Does anything leave my machine?{{icon:alt-arrow-down-linear}}</summary>
+        <div class="faq-a"><p>No. There is no account and no telemetry. Run on your own history, it makes no network calls at all; pointed at a backend, it only queries that backend, read-only, with a credential you create and can revoke.</p></div>
+      </details>
+      <details>
+        <summary>Do I need Grafana or Datadog?{{icon:alt-arrow-down-linear}}</summary>
+        <div class="faq-a"><p>No. With no arguments it reads your own Claude Code history. The backends are for teams that already collect telemetry and want the report across everyone. <a href="https://github.com/negi6711/mycroftcompute/blob/main/docs/team-backends.md" rel="noopener">docs/team-backends.md</a> covers setting one up, including the traps: Grafana needs cumulative counters and silently gets nothing without them; Datadog silently drops them.</p></div>
+      </details>
+      <details>
+        <summary>Why is every figure “at most”, and why not add them up?{{icon:alt-arrow-down-linear}}</summary>
+        <div class="faq-a"><p>Usage data cannot know everything about how your agent runs, so each dollar figure is the most a change could be worth over the period: a ceiling, never a promised saving.</p><p>The ceilings also overlap. In the sample, the housekeeping traffic is inside the claude-opus-5 total that the model-switch finding prices, so a sum would count it twice.</p></div>
+      </details>
+      <details>
+        <summary>How are the prices kept right?{{icon:alt-arrow-down-linear}}</summary>
+        <div class="faq-a"><p>The table covers 19 models from Anthropic, OpenAI and Google, with cache read and write multipliers, per-model cache minimums and long-context surcharges, checked by hand against each vendor’s own pricing page. It is a personal project, so the table will age between updates; once it is more than 31 days old, the report says so beside the date. List prices only: negotiated or batch rates are lower.</p></div>
+      </details>
+      <details>
+        <summary>Does it cover Codex, Cursor or Copilot?{{icon:alt-arrow-down-linear}}</summary>
+        <div class="faq-a"><p>Claude Code only. The price table already includes OpenAI and Google models, and the backend readers understand the OpenTelemetry standard for model usage, but only Claude Code has been checked against real data.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-top">
+      <div>
+        <a class="brand" href="#top">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+          mycroftcompute
+        </a>
+        <p class="foot-line">Where your Claude Code money goes, priced with the cache counted. Open source, MIT licensed.</p>
+      </div>
+      <div class="foot-links">
+        <span>Built by <a href="https://www.linkedin.com/in/adityanegi1123" rel="noopener noreferrer">Aditya Negi</a></span>
+        <a href="https://github.com/negi6711/mycroftcompute" rel="noopener">GitHub</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>No cookies, no analytics. This page loads nothing from anywhere else.</span>
+      <a href="licenses/CREDITS.txt">Fonts, icons and licences</a>
+    </div>
+  </div>
+</footer>
+
+<p class="sr-only" role="status" aria-live="polite" data-copy-status></p>
+
+<script src="js/gsap.min.js" defer></script>
+<script src="js/ScrollTrigger.min.js" defer></script>
+<script src="js/lenis.min.js" defer></script>
+<script src="js/main.js" defer></script>
+</body>
+</html>

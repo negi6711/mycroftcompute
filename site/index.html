@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mycroftcompute: where your Claude Code money goes</title>
+<meta name="description" content="mycroftcompute is an open-source command-line tool. It reads your Claude Code history, or your team's Grafana or Datadog telemetry, prices every token with the prompt cache counted, and prints what is worth changing. MIT licensed, nothing uploaded.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230b0c0e'/%3E%3Crect x='4' y='9.5' width='10' height='10' rx='1.2' fill='%23eeeeea'/%3E%3Ccircle cx='14.5' cy='9.5' r='5' fill='none' stroke='%23f2b43c' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preload" href="fonts/mona-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/martian-mono-var.woff2" as="font" type="font/woff2" crossorigin>
+<script src="js/boot.js"></script>
+<!--
+  Mycroft landing page. Built with the build-awwwards-quality-sites skill, paired with landing-page.
+
+  Direction: a dark measuring instrument lit by one sodium-amber accent. The page leads with the
+  gain (where the money went, what is worth changing), shows the four findings of a sample report
+  straight after the hero, then the cache story, the command line, and how to install it.
+
+  Sample figures are quoted only from docs/sample-report-august.txt and
+  docs/sample-report-september.txt: an invented 24-developer team run through the real engine
+  (`mycroftcompute --sample` prints the September one). Ceilings overlap, so they are never added.
+
+  Provenance (nothing loads from a third party at runtime):
+  - Mona Sans (GitHub, OFL 1.1) and Martian Mono (Evil Martians, OFL 1.1), via @fontsource. licenses/
+  - GSAP 3.12.5 and ScrollTrigger 3.12.5 (GreenSock standard licence), Lenis 1.3.26 (MIT). js/
+  - Interface icons: Solar by 480 Design, CC BY 4.0, via Iconify. Credited in licenses/CREDITS.txt.
+  - Grafana and Datadog marks: Iconify "logos" set (CC0). Trademarks of their owners, shown only
+    as "works with". No Anthropic or Claude mark is used.
+  - No photographs, avatars or illustrations. Every visual is the product's own UI or arithmetic.
+  - Chart geometry is computed by site-src/build.py from src/mycroftcompute/economics/caching.py.
+-->
+<style>
+/* Build stamp: skill=build-awwwards-quality-sites+landing-page | lane=dark instrument, sodium amber
+   | type=Mona Sans (wdth 75-125) + Martian Mono | motion=GSAP+ScrollTrigger, Lenis | three.js=no */
+
+@font-face { font-family: "Mona Sans"; src: url("fonts/mona-sans-var.woff2") format("woff2"); font-weight: 200 900; font-stretch: 75% 125%; font-display: swap; }
+@font-face { font-family: "Martian Mono"; src: url("fonts/martian-mono-var.woff2") format("woff2"); font-weight: 100 800; font-stretch: 75% 112.5%; font-display: swap; }
+
+:root {
+  /* Light theme. Every text pairing checked at 4.5:1 or better. */
+  --bg: #f4f4f1;
+  --raise: #ffffff;
+  --sunk: #ebebe7;
+  --ink: #0d0f12;
+  --ink-2: #30353c;
+  --muted: #5a6069;
+  --faint: #646a73;
+  --line: #dedfda;
+  --line-2: #c9cbc5;
+  --accent: #8a5600;        /* text in amber */
+  --accent-fill: #e3a12f;   /* fills, never text */
+  --accent-line: #b06f00;   /* chart line, 3:1 on paper */
+  --accent-wash: rgba(227, 161, 47, .16);
+  --red: #b8402b;
+  --ok: #1c7444;
+  --stay: #48505a;
+  --btn-bg: #0d0f12;
+  --btn-fg: #ffffff;
+  --tile: #ffffff;
+  --shadow: 0 1px 0 rgba(13,15,18,.04), 0 24px 60px -24px rgba(13,15,18,.18), 0 60px 120px -60px rgba(13,15,18,.22);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0c0e; --raise: #121418; --sunk: #08090b; --ink: #eeeeea; --ink-2: #c5c8cd; --muted: #8e939b;
+    --faint: #7a8089; --line: #1f2227; --line-2: #2c3037; --accent: #f2b43c; --accent-fill: #f2b43c;
+    --accent-line: #f2b43c; --accent-wash: rgba(242, 180, 60, .12); --red: #ff7a66; --ok: #6fcf97;
+    --stay: #b4bac2; --btn-bg: #f2b43c; --btn-fg: #0b0c0e; --tile: #eeeeea;
+    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 30px 80px -30px rgba(0,0,0,.8), 0 80px 160px -80px rgba(0,0,0,.9);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0c0e; --raise: #121418; --sunk: #08090b; --ink: #eeeeea; --ink-2: #c5c8cd; --muted: #8e939b;
+  --faint: #7a8089; --line: #1f2227; --line-2: #2c3037; --accent: #f2b43c; --accent-fill: #f2b43c;
+  --accent-line: #f2b43c; --accent-wash: rgba(242, 180, 60, .12); --red: #ff7a66; --ok: #6fcf97;
+  --stay: #b4bac2; --btn-bg: #f2b43c; --btn-fg: #0b0c0e; --tile: #eeeeea;
+  --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 30px 80px -30px rgba(0,0,0,.8), 0 80px 160px -80px rgba(0,0,0,.9);
+  color-scheme: dark;
+}
+
+:root {
+  --sans: "Mona Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --gutter: clamp(16px, 4vw, 48px);
+  --max: 1280px;
+  --section: clamp(56px, 6vw, 88px);
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 22px;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --nav-h: 64px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 16px); }
+@media (prefers-reduced-motion: no-preference) { html:not(.lenis) { scroll-behavior: smooth; } }
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-stopped { overflow: clip; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 17px; line-height: 1.6; font-weight: 420; font-stretch: 100%;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; }
+p { margin: 0; }
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 640; text-wrap: balance; }
+code, .mono { font-family: var(--mono); font-stretch: 87.5%; font-size: .84em; font-weight: 420; letter-spacing: 0; }
+code { background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; padding: .08em .38em; white-space: nowrap; }
+::selection { background: var(--accent-fill); color: #0b0c0e; }
+:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 3px; border-radius: 4px; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--btn-bg); color: var(--btn-fg); padding: 10px 14px; border-radius: var(--r-sm); text-decoration: none; font-weight: 600; }
+.skip:focus { top: 12px; }
+.wrap { width: 100%; max-width: calc(var(--max) + var(--gutter) * 2); margin: 0 auto; padding: 0 var(--gutter); }
+.i { width: 1.15em; height: 1.15em; flex: none; }
+
+/* Page frame: two hairlines at the container edges, the instrument's scale. */
+.frame { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.frame::before, .frame::after { content: ""; position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); opacity: .7; }
+.frame::before { left: max(var(--gutter), calc((100vw - var(--max)) / 2 - 1px)); }
+.frame::after { right: max(var(--gutter), calc((100vw - var(--max)) / 2 - 1px)); }
+@media (max-width: 720px) { .frame { display: none; } }
+main, header, footer { position: relative; z-index: 1; }
+
+/* Buttons and links */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 20px 0 22px;
+  background: var(--btn-bg); color: var(--btn-fg); border-radius: 999px; text-decoration: none;
+  font-weight: 620; font-stretch: 104%; font-size: 16px; letter-spacing: -.005em;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease), background-color .2s;
+  box-shadow: 0 0 0 0 var(--accent-wash);
+}
+.btn .i { transition: transform .3s var(--ease); }
+@media (hover: hover) {
+  .btn:hover { box-shadow: 0 0 0 6px var(--accent-wash); }
+  .btn:hover .i { transform: translateX(3px); }
+}
+.btn:active { transform: scale(.98); }
+.btn-sm { min-height: 38px; padding: 0 16px; font-size: 14.5px; }
+.link { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; color: var(--ink); font-weight: 560; text-decoration: none; }
+.link span { background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1px no-repeat; padding-bottom: 2px; transition: background-size .3s var(--ease); }
+@media (hover: hover) { .link:hover span { background-size: 0 1px; background-position: 100% 100%; } }
+
+/* Mail fallbacks: mailto needs a mail app, so the address is always visible and copyable. */
+.mail-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+.mail-alt .addr { font-family: var(--mono); font-stretch: 87.5%; font-size: 13px; color: var(--ink); margin-right: 4px; user-select: all; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; text-decoration: none; cursor: pointer; transition: background-color .2s, border-color .2s, color .2s; }
+.chip .i { width: 14px; height: 14px; }
+@media (hover: hover) { .chip:hover { background: var(--sunk); border-color: var(--line-2); color: var(--ink); } }
+.chip.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.chip[data-copy] { display: none; }
+html.js .chip[data-copy] { display: inline-flex; }
+
+/* Apply menu: mailto alone does nothing without a desktop mail app, so the button offers every route. */
+.apply-pop { position: fixed; z-index: 60; width: min(300px, calc(100vw - 24px)); padding: 8px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+.apply-pop[hidden] { display: none; }
+.ap-head { padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.ap-head .addr { display: block; margin-top: 2px; font-family: var(--mono); font-stretch: 87.5%; font-size: 13px; color: var(--ink); user-select: all; }
+.ap-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink); font: inherit; font-size: 15px; font-weight: 540; text-align: left; text-decoration: none; cursor: pointer; }
+.ap-item .i { width: 18px; height: 18px; color: var(--muted); }
+.ap-item:hover, .ap-item:focus-visible { background: var(--sunk); }
+.ap-item.done, .ap-item.done .i { color: var(--ok); }
+
+/* Section scaffolding */
+.section { padding: var(--section) 0; position: relative; }
+.label {
+  display: flex; align-items: center; gap: 14px; margin-bottom: clamp(24px, 3vw, 36px);
+  font-family: var(--mono); font-stretch: 87.5%; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.label b { color: var(--accent); font-weight: 500; }
+.label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.h2 { font-size: clamp(30px, 3.9vw, 56px); line-height: 1.03; letter-spacing: -.034em; font-stretch: 108%; font-weight: 640; max-width: 24ch; }
+.intro { color: var(--ink-2); font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; max-width: 58ch; margin-top: 20px; }
+.head-row { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 20px 64px; align-items: end; }
+.head-row .intro { margin-top: 0; }
+@media (max-width: 900px) { .head-row { grid-template-columns: minmax(0, 1fr); } }
+.split .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 .02em .12em; margin: 0 -.02em -.12em; }
+.split .wi { display: inline-block; }
+.tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; background: var(--accent-wash); color: var(--accent); font-weight: 500; white-space: nowrap; }
+.tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-fill); }
+.sample-note { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+
+/* Motion pre-states: only when boot.js has confirmed motion is allowed. */
+html.motion [data-split] { visibility: hidden; }
+html.motion [data-reveal] { opacity: 0; }
+
+/* ---------- Nav ---------- */
+.nav { position: sticky; top: 0; z-index: 50; height: var(--nav-h); background: var(--bg); transition: box-shadow .3s; }
+.nav.is-stuck { box-shadow: 0 1px 0 var(--line); }
+.nav .wrap { height: 100%; display: flex; align-items: center; gap: 28px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; font-stretch: 112%; font-size: 18px; letter-spacing: -.02em; }
+.mark { width: 24px; height: 24px; }
+.mark .sq { fill: currentColor; }
+.mark .lens { fill: none; stroke: var(--accent-fill); stroke-width: 2; }
+.nav-links { display: flex; gap: 4px; margin-left: 12px; }
+.nav-links a { padding: 8px 12px; border-radius: 999px; text-decoration: none; color: var(--muted); font-size: 15px; font-weight: 520; transition: color .2s, background-color .2s; }
+@media (hover: hover) { .nav-links a:hover { color: var(--ink); background: var(--sunk); } }
+.nav-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; transition: background-color .2s, border-color .2s; }
+@media (hover: hover) { .icon-btn:hover { background: var(--sunk); border-color: var(--line-2); } }
+.theme-btn .moon { display: none; }
+:root[data-theme="light"] .theme-btn .sun { display: none; }
+:root[data-theme="light"] .theme-btn .moon { display: block; }
+.theme-btn { display: none; }
+html.js .theme-btn { display: grid; }
+.menu { display: none; position: relative; }
+.menu summary { list-style: none; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu-panel { position: absolute; right: 0; top: calc(100% + 10px); min-width: 220px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px; box-shadow: var(--shadow); display: grid; }
+.menu-panel a { padding: 12px 14px; border-radius: var(--r-md); text-decoration: none; font-weight: 540; }
+.menu-panel a:hover { background: var(--sunk); }
+@media (max-width: 880px) {
+  .nav-links { display: none; }
+  .menu { display: block; }
+}
+@media (max-width: 420px) { .nav .btn-sm { display: none; } }
+
+/* ---------- Hero ---------- */
+.hero { padding: clamp(28px, 4vw, 56px) 0 clamp(56px, 7vw, 96px); }
+.status { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; color: var(--ink-2); background: var(--raise); }
+.status .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-fill); box-shadow: 0 0 0 4px var(--accent-wash); flex: none; }
+.status b { font-weight: 620; color: var(--ink); }
+.h1 {
+  margin-top: clamp(22px, 3vw, 36px);
+  font-size: clamp(36px, 4.5vw, 68px); line-height: .98; letter-spacing: -.044em; font-weight: 680; font-stretch: 112%;
+  max-width: none;
+}
+.h1 .soft { color: var(--muted); display: block; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(32px, 5vw, 72px); margin-top: clamp(32px, 4vw, 52px); align-items: start; }
+.hero-copy { padding-top: 4px; }
+.lede { font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; color: var(--ink-2); max-width: 40ch; }
+.lede strong { color: var(--ink); font-weight: 620; }
+.ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; margin-top: 28px; }
+.works { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
+.works-label { font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.works ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.works li { display: inline-flex; align-items: center; gap: 10px; font-weight: 580; font-size: 15.5px; }
+.tile { width: 30px; height: 30px; border-radius: 8px; background: var(--tile); display: grid; place-items: center; box-shadow: 0 0 0 1px var(--line); flex: none; }
+.tile .logo { width: 18px; height: 18px; }
+.tile.sm { width: 18px; height: 18px; border-radius: 5px; }
+.tile.sm .logo { width: 12px; height: 12px; }
+.readonly { display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; font-size: 14.5px; color: var(--muted); line-height: 1.5; max-width: 40ch; }
+.readonly .i { color: var(--ok); margin-top: 2px; }
+@media (max-width: 1023px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .lede, .readonly { max-width: 58ch; }
+}
+
+/* ---------- App window (every preview) ---------- */
+.win { background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow); overflow: hidden; font-size: 14.5px; line-height: 1.5; color: var(--ink); transform-origin: 50% 0; }
+.win-bar { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--raise); }
+.win-bar .mark { width: 18px; height: 18px; flex: none; }
+.crumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13.5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb b { color: var(--ink); font-weight: 580; }
+.win-bar .tag { margin-left: auto; }
+.pane { padding: clamp(18px, 2.4vw, 32px); min-width: 0; }
+.win-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px; padding: 14px clamp(18px, 2.4vw, 32px); border-top: 1px solid var(--line); background: var(--sunk); font-size: 13.5px; color: var(--ink-2); }
+.win-foot b { color: var(--accent); font-weight: 620; }
+.win-foot a { color: var(--ink); font-weight: 580; text-underline-offset: 4px; }
+.price-note { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.price-note .i { width: 15px; height: 15px; color: var(--ok); }
+.find-no { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--bg); font-family: var(--mono); font-stretch: 87.5%; font-size: 12px; font-weight: 500; flex: none; }
+.num { font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.num.dim { color: var(--muted); }
+.cap { margin: 0 0 10px; font-family: var(--mono); font-stretch: 87.5%; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); font-weight: 450; }
+@media (max-width: 520px) {
+  .win { font-size: 13.5px; border-radius: var(--r-lg); }
+  .win-bar .tag { display: none; }
+}
+
+/* Hero report: where the money went */
+.rep-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.rep-title { font-size: 13.5px; color: var(--muted); }
+.rep-total { font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(30px, 3.4vw, 44px); letter-spacing: -.045em; line-height: 1.05; margin-top: 6px; font-weight: 420; }
+.rep-total small { font-family: var(--sans); font-stretch: 100%; font-size: 13.5px; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
+.rep-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.meta-pill { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--sunk); color: var(--ink-2); border: 1px solid var(--line); }
+.rep-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 20px; }
+.bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--sunk); margin-bottom: 12px; }
+.bar span { display: block; height: 100%; transform-origin: 0 50%; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.rows li:last-child { border-bottom: 0; }
+.rows i { width: 8px; height: 8px; border-radius: 2px; align-self: center; }
+.rows .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows small { color: var(--muted); }
+.c1 { background: var(--stay); } .c2 { background: var(--accent-fill); } .c3 { background: var(--line-2); } .c4 { background: var(--muted); }
+@media (max-width: 760px) { .rep-cols { grid-template-columns: minmax(0, 1fr); gap: 18px; } }
+
+/* ---------- Findings ---------- */
+.findings-win { margin-top: clamp(36px, 4vw, 56px); perspective: 1800px; }
+.fw-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.f-list { list-style: none; margin: 0; padding: 10px; background: var(--sunk); border-right: 1px solid var(--line); display: grid; gap: 4px; align-content: start; }
+.f-item { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 4px 14px; padding: 14px; border-radius: 12px; text-decoration: none; color: var(--ink-2); transition: background-color .25s, box-shadow .25s, color .25s; }
+.f-item .t { font-size: 14.5px; line-height: 1.35; font-weight: 580; color: var(--ink); }
+.f-item .c { grid-column: 2; font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; color: var(--accent); }
+.f-item .c.attr { color: var(--muted); font-family: var(--sans); font-stretch: 100%; font-size: 13px; }
+@media (hover: hover) { .f-item:hover { background: color-mix(in srgb, var(--raise) 60%, transparent); } }
+.f-item[aria-current="true"] { background: var(--raise); box-shadow: 0 0 0 1px var(--line); }
+.f-item[aria-current="true"] .find-no { background: var(--accent-fill); color: #0b0c0e; }
+.f-details { padding: clamp(20px, 3vw, 36px); min-width: 0; }
+.f-detail + .f-detail { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--line); }
+html.js .f-detail { display: none; margin: 0; padding: 0; border: 0; }
+html.js .f-detail.is-open { display: block; }
+.fd-head { display: flex; gap: 14px; align-items: flex-start; }
+.fd-head h3 { font-size: clamp(18px, 1.7vw, 22px); line-height: 1.25; letter-spacing: -.014em; font-weight: 620; }
+.fast { display: inline-flex; margin-top: 10px; white-space: normal; line-height: 1.4; }
+.fd-head > div { min-width: 0; }
+.fd-shows { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; color: var(--ink-2); font-size: 14.5px; }
+.fd-shows li { padding-left: 16px; position: relative; }
+.fd-shows li::before { content: ""; position: absolute; left: 0; top: .7em; width: 6px; height: 1px; background: var(--muted); }
+.ceiling { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: var(--accent-wash); border: 1px solid color-mix(in srgb, var(--accent-fill) 35%, transparent); }
+.ceiling b { font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(18px, 1.9vw, 24px); color: var(--accent); font-weight: 520; letter-spacing: -.03em; }
+.ceiling span { color: var(--ink-2); font-size: 13.5px; }
+.ceiling.attr { background: var(--sunk); border-color: var(--line); }
+.ceiling.attr b { color: var(--ink); font-family: var(--sans); font-stretch: 100%; font-size: 15px; letter-spacing: 0; font-weight: 600; }
+.fd-next, .fd-cannot { margin-top: 16px; font-size: 14px; color: var(--ink-2); }
+.fd-next b, .fd-cannot b { display: block; color: var(--ink); font-weight: 620; margin-bottom: 2px; }
+.fd-cannot { padding-top: 14px; border-top: 1px dashed var(--line-2); }
+.devs { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 7px; position: relative; }
+.devs li { display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13px; }
+.devs .who { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.devs .track { position: relative; height: 8px; border-radius: 999px; background: var(--sunk); }
+.devs .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--stay); transform-origin: 0 50%; }
+.devs li:nth-child(-n+3) .fill { background: var(--accent-fill); }
+.devs .median { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--ink); opacity: .55; }
+.devs-note { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 900px) {
+  .fw-body { grid-template-columns: minmax(0, 1fr); }
+  .f-list { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+@media (max-width: 520px) { .devs li { grid-template-columns: minmax(0, 104px) minmax(0, 1fr) auto; gap: 8px; } }
+
+/* ---------- Cache ---------- */
+.cache-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(24px, 3.4vw, 48px); margin-top: clamp(32px, 4vw, 48px); align-items: start; }
+.meters { display: grid; gap: 12px; }
+.meter { border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--raise); padding: clamp(20px, 2.2vw, 28px); }
+.meter-k { font-size: 13.5px; color: var(--muted); }
+.meter-v { display: block; margin-top: 8px; font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(40px, 4.2vw, 60px); line-height: .95; letter-spacing: -.06em; font-weight: 380; }
+.meter-l { margin-top: 10px; color: var(--ink-2); font-size: 15.5px; }
+.meter-bar { position: relative; height: 8px; border-radius: 999px; background: var(--sunk); margin-top: 16px; overflow: hidden; }
+.meter-bar span { position: absolute; inset: 0 auto 0 0; background: var(--accent-fill); border-radius: 999px; transform-origin: 0 50%; }
+.meter-sub { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+.causes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; }
+.causes-k { flex-basis: 100%; font-size: 14.5px; color: var(--ink-2); }
+.causes span.cz { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 13.5px; color: var(--ink-2); background: var(--raise); }
+.cache-claim { margin-top: 22px; font-size: clamp(18px, 1.7vw, 22px); line-height: 1.3; letter-spacing: -.016em; font-weight: 560; max-width: 44ch; }
+.cache-claim b { color: var(--accent); font-weight: 620; }
+.switch-copy { margin-bottom: 20px; }
+.switch h3 { font-size: clamp(24px, 2.4vw, 32px); line-height: 1.04; letter-spacing: -.032em; font-stretch: 108%; font-weight: 640; }
+.switch p { margin-top: 10px; color: var(--ink-2); max-width: 60ch; }
+.switch p b { color: var(--accent); font-weight: 620; }
+@media (max-width: 1023px) { .cache-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* The switch chart */
+.instrument { margin: 0; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow); overflow: hidden; }
+.inst-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; padding: 20px 24px 0; }
+.inst-title { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.inst-title span { display: block; color: var(--muted); font-weight: 440; font-size: 13.5px; margin-top: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--ink-2); }
+.legend li { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 18px; height: 3px; border-radius: 2px; background: currentColor; }
+.s-stay { color: var(--stay); }
+.s-switch { color: var(--accent-line); }
+.s-alt { color: var(--red); }
+.plot { position: relative; padding: 8px 12px 0; touch-action: pan-y; cursor: crosshair; }
+.plot svg { width: 100%; height: auto; overflow: visible; }
+.gl { stroke: var(--line); stroke-width: 1; }
+.gb { stroke: var(--line-2); stroke-width: 1; }
+.gt { fill: var(--faint); font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; }
+.series { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.series.stay { stroke: var(--stay); }
+.series.switch { stroke: var(--accent-line); stroke-width: 3; }
+.series.alt { stroke: var(--red); }
+.axis-note { fill: var(--muted); font-family: var(--sans); font-size: 12.5px; }
+.alt-note { fill: var(--red); font-family: var(--sans); font-size: 12.5px; font-weight: 560; }
+.pay-ring { fill: var(--raise); stroke: var(--accent-line); stroke-width: 2.5; }
+.pay-note { fill: var(--accent); font-family: var(--sans); font-weight: 620; font-size: 13px; }
+.guide { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 4; opacity: .5; }
+.dot { stroke: var(--raise); stroke-width: 3; }
+.dot.stay { fill: var(--stay); }
+.dot.switch { fill: var(--accent-line); }
+.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); margin-top: 6px; }
+.readout > div { padding: 14px 20px 16px; border-left: 1px solid var(--line); min-width: 0; }
+.readout > div:first-child { border-left: 0; }
+.ro-k { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.ro-k i { width: 10px; height: 3px; border-radius: 2px; background: currentColor; }
+.ro-v { display: block; margin-top: 6px; font-family: var(--mono); font-stretch: 87.5%; font-size: clamp(17px, 1.7vw, 21px); font-weight: 460; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.scrubber { display: flex; align-items: center; gap: 16px; padding: 14px 20px 18px; border-top: 1px solid var(--line); background: var(--sunk); }
+.scrub-n { font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; color: var(--muted); white-space: nowrap; min-width: 11ch; }
+.scrub-n b { color: var(--ink); font-weight: 500; }
+.verdict-line { flex: 1; font-size: 14px; color: var(--ink-2); min-width: 0; }
+.verdict-line b { color: var(--accent); font-weight: 620; }
+input[type="range"].scrub { -webkit-appearance: none; appearance: none; width: clamp(120px, 20vw, 200px); height: 28px; background: transparent; cursor: ew-resize; margin: 0; }
+.scrub::-webkit-slider-runnable-track { height: 2px; background: var(--line-2); border-radius: 2px; }
+.scrub::-moz-range-track { height: 2px; background: var(--line-2); border-radius: 2px; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -8px; border-radius: 50%; background: var(--accent-fill); border: 3px solid var(--raise); box-shadow: 0 0 0 1px var(--accent-line); }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent-fill); border: 3px solid var(--raise); box-shadow: 0 0 0 1px var(--accent-line); }
+.scrub:focus-visible { outline: none; }
+.scrub:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--accent-line), 0 0 0 6px var(--accent-wash); }
+.scrub:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px var(--accent-line), 0 0 0 6px var(--accent-wash); }
+.inst-foot { padding: 12px 24px 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; border-top: 1px solid var(--line); }
+.scrub-row { display: none; }
+html.js .scrub-row { display: block; }
+@media (max-width: 560px) {
+  .inst-head { padding: 18px 16px 0; }
+  .plot { padding: 4px 2px 0; }
+  .readout > div { padding: 12px 12px 14px; }
+  .scrubber { flex-wrap: wrap; padding: 14px 16px 16px; gap: 10px 14px; }
+  .verdict-line { flex-basis: 100%; order: 3; }
+  input[type="range"].scrub { flex: 1; width: auto; }
+  .inst-foot { padding: 12px 16px 16px; }
+  .gt { font-size: 17px; }
+  .axis-note, .alt-note, .pay-note { font-size: 20px; }
+}
+
+/* ---------- Statement ---------- */
+.statement-sec { padding: 0 0 clamp(24px, 3vw, 40px); }
+.statement { font-size: clamp(30px, 4.2vw, 62px); line-height: 1; letter-spacing: -.042em; font-weight: 660; font-stretch: 114%; max-width: 26ch; }
+.statement em { font-style: normal; color: var(--accent); display: block; }
+@media (min-width: 720px) { .statement .nw { white-space: nowrap; } }
+.namesake { margin-top: 16px; max-width: 52ch; color: var(--ink-2); font-size: 16.5px; }
+
+/* ---------- Web app ---------- */
+.flow { list-style: none; margin: clamp(32px, 4vw, 48px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.flow li { padding: 18px 18px 20px 0; min-width: 0; }
+.flow li + li { padding-left: 18px; border-left: 1px solid var(--line); }
+.flow .n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line-2); font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; color: var(--ink); }
+.flow li.shown .n { background: var(--accent-fill); border-color: transparent; color: #0b0c0e; }
+.flow b { display: block; margin-top: 10px; font-weight: 620; font-size: 15.5px; letter-spacing: -.01em; }
+.flow p { margin-top: 4px; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+.flow a { color: var(--ink); text-underline-offset: 3px; }
+.app-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; align-items: start; }
+.app-pair figure { margin: 0; }
+.app-pair figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); }
+@media (max-width: 1023px) {
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .flow li, .flow li + li { padding: 14px 0; border-left: 0; display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 8px; }
+  .flow li + li { border-top: 1px solid var(--line); }
+  .flow li > :not(.n) { grid-column: 2; }
+  .flow b { margin-top: 1px; }
+  .app-pair { grid-template-columns: minmax(0, 1fr); }
+}
+.checks { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.checks li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.checks li:first-child { border-top: 0; }
+.checks .i { width: 18px; height: 18px; margin-top: 1px; }
+.checks .ok .i { color: var(--ok); }
+.checks .miss { background: var(--accent-wash); }
+.checks .miss .i { color: var(--accent); }
+.checks .lab { font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; color: var(--muted); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.checks .why { display: block; margin-top: 3px; color: var(--ink-2); font-size: 12.5px; }
+.ready { margin-top: 12px; font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; align-items: center; }
+.ready .i { color: var(--ok); }
+.cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cmp div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.cmp small { display: block; color: var(--muted); font-size: 12.5px; }
+.cmp b { display: block; margin-top: 4px; font-family: var(--mono); font-stretch: 87.5%; font-weight: 440; font-size: clamp(16px, 1.5vw, 20px); letter-spacing: -.035em; }
+.delta { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); }
+.delta b { color: var(--ink); font-weight: 620; }
+.moved { margin-top: 16px; }
+.moved-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; margin-top: 6px; }
+.moved-item s { color: var(--muted); text-decoration-color: var(--line-2); }
+.moved-item .mv { display: block; margin-top: 2px; font-family: var(--mono); font-stretch: 87.5%; font-size: 12px; color: var(--accent); }
+.moved-note { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+.moved .cap { margin-top: 14px; }
+
+/* ---------- Trust ---------- */
+.trust-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: clamp(32px, 4vw, 48px); }
+.panel { border: 1px solid var(--line); border-radius: var(--r-xl); padding: clamp(22px, 2.6vw, 32px); background: var(--raise); }
+.panel h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 19px; letter-spacing: -.015em; font-stretch: 106%; }
+.panel h3 small { font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 420; }
+.panel ul { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 12px; }
+.panel li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; color: var(--ink-2); font-size: 15.5px; }
+.panel li .i { margin-top: 3px; }
+.panel.reads .i { color: var(--ok); }
+.panel.never-p .i { color: var(--red); }
+.backend-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; align-items: start; padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--line); }
+.backend-row .tile { width: 44px; height: 44px; border-radius: 12px; }
+.backend-row .tile .logo { width: 26px; height: 26px; }
+.backend-row b { display: block; font-size: 15.5px; font-weight: 620; }
+.backend-row p { margin-top: 4px; color: var(--ink-2); font-size: 14.5px; }
+.recon { margin-top: 16px; color: var(--ink-2); font-size: 15px; max-width: 80ch; }
+.recon b { color: var(--ink); font-weight: 620; }
+.facts { list-style: none; margin: clamp(28px, 3vw, 40px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.facts li { padding: 22px 20px 0 0; }
+.facts li + li { padding-left: 20px; border-left: 1px solid var(--line); }
+.facts b { display: block; font-family: var(--mono); font-stretch: 87.5%; font-weight: 380; font-size: clamp(36px, 3.8vw, 54px); letter-spacing: -.06em; line-height: .9; }
+.facts b em { font-style: normal; font-size: .4em; letter-spacing: -.02em; color: var(--muted); margin-left: .15em; }
+.facts span { display: block; margin-top: 12px; color: var(--ink-2); font-size: 14.5px; max-width: 26ch; }
+@media (max-width: 900px) {
+  .trust-grid { grid-template-columns: minmax(0, 1fr); }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 28px; }
+  .facts li:nth-child(3) { border-left: 0; padding-left: 0; }
+}
+@media (max-width: 560px) {
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .facts li { border-left: 0 !important; padding-left: 0 !important; }
+}
+
+/* ---------- Roadmap ---------- */
+.road { position: relative; margin-top: clamp(36px, 4vw, 56px); }
+.road-track { position: absolute; left: 0; right: 0; top: 15px; height: 2px; background: var(--line); border-radius: 2px; }
+.road-fill { position: absolute; left: 0; top: 15px; height: 2px; width: 42%; background: var(--accent-fill); border-radius: 2px; transform-origin: 0 50%; }
+.road ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; position: relative; }
+.node { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line-2); color: var(--muted); }
+.node .i { width: 16px; height: 16px; }
+.done .node { border-color: var(--accent-fill); color: var(--accent); }
+.now .node { background: var(--accent-fill); border-color: var(--accent-fill); color: #0b0c0e; box-shadow: 0 0 0 6px var(--accent-wash); }
+.road-state { display: inline-block; margin-top: 18px; font-family: var(--mono); font-stretch: 87.5%; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.done .road-state, .now .road-state { color: var(--accent); }
+.road h3 { margin-top: 6px; font-size: 18px; line-height: 1.2; letter-spacing: -.015em; font-weight: 620; }
+.road p { margin-top: 6px; color: var(--ink-2); font-size: 14.5px; }
+.later { margin-top: 28px; color: var(--muted); font-size: 14.5px; }
+@media (max-width: 900px) {
+  .road ol { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .road ol li { display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 18px; }
+  .road ol li > :not(.node) { grid-column: 2; }
+  .road-state { margin-top: 6px; }
+  .road-track { left: 15px; right: auto; top: 0; bottom: 0; width: 2px; height: auto; }
+  .road-fill { left: 15px; top: 0; width: 2px; height: 0; transform-origin: 50% 0; }
+}
+
+/* ---------- The two-minute cache check ---------- */
+.check { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 28px clamp(24px, 4vw, 56px); align-items: start; margin-top: clamp(48px, 6vw, 80px); padding-top: clamp(32px, 4vw, 48px); border-top: 1px solid var(--line); }
+.check h3 { margin-top: 14px; font-size: clamp(24px, 2.4vw, 32px); line-height: 1.06; letter-spacing: -.032em; font-stretch: 108%; font-weight: 640; max-width: 22ch; text-wrap: balance; }
+.check h3 em { font-style: normal; color: var(--accent); }
+.check-copy p { margin-top: 12px; color: var(--ink-2); max-width: 52ch; }
+.check-copy p b { color: var(--accent); font-weight: 620; }
+.check-send a { color: var(--ink); font-weight: 580; text-underline-offset: 4px; }
+.check-win .win-bar > svg { width: 18px; height: 18px; flex: none; }
+.check-win .win-bar .chip { margin-left: auto; flex: none; }
+.check-q { margin: 0; max-height: 340px; overflow: auto; padding: 16px 18px; background: var(--sunk); border-bottom: 1px solid var(--line); font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; line-height: 1.65; color: var(--ink); }
+.check-q code { background: none; border: 0; padding: 0; white-space: pre; font: inherit; }
+.check-note { padding: 14px 18px; font-size: 13.5px; color: var(--ink-2); }
+.check-dd { border-top: 1px solid var(--line); }
+.check-dd summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; cursor: pointer; list-style: none; font-weight: 580; font-size: 14.5px; }
+.check-dd summary::-webkit-details-marker { display: none; }
+.check-dd summary .i { color: var(--muted); transition: transform .35s var(--ease); }
+.check-dd[open] summary .i { transform: rotate(180deg); }
+.check-dd-body { display: grid; gap: 10px; padding: 0 18px 18px; font-size: 14px; color: var(--ink-2); }
+.check-dd-body ol { display: grid; gap: 8px; padding-left: 20px; }
+.check-dd-body code { white-space: normal; }
+.check-formula { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.check-formula code { font-family: var(--mono); font-stretch: 87.5%; font-size: 12.5px; }
+.founding { margin-top: 16px; padding: 12px 16px; border-left: 3px solid var(--accent-fill); background: var(--accent-wash); border-radius: 0 var(--r-md) var(--r-md) 0; color: var(--ink); max-width: 58ch; }
+.founding b { color: var(--accent); font-weight: 640; }
+@media (max-width: 900px) { .check { grid-template-columns: minmax(0, 1fr); } }
+
+.install-line .addr { font-size: 14px; }
+.install-line + .install-line { margin-top: 8px; }
+.flow code { background: none; border: 0; padding: 0; font-family: var(--mono); font-stretch: 87.5%; font-size: .92em; }
+
+/* ---------- FAQ ---------- */
+.faq-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 24px 64px; }
+.faq-list { border-top: 1px solid var(--line); }
+.faq-list details { border-bottom: 1px solid var(--line); }
+.faq-list summary { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; cursor: pointer; list-style: none; font-size: clamp(16.5px, 1.4vw, 18.5px); font-weight: 580; letter-spacing: -.01em; }
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary .i { color: var(--muted); transition: transform .35s var(--ease); }
+.faq-list details[open] summary .i { transform: rotate(180deg); }
+@media (hover: hover) { .faq-list summary:hover { color: var(--accent); } }
+.faq-a { padding: 0 0 20px; color: var(--ink-2); max-width: 64ch; display: grid; gap: 10px; font-size: 16px; }
+@media (max-width: 900px) { .faq-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Pilot ---------- */
+.pilot { padding-bottom: clamp(64px, 8vw, 112px); }
+.pilot-card { border: 1px solid var(--line); border-radius: calc(var(--r-xl) + 6px); background: var(--raise); box-shadow: var(--shadow); overflow: hidden; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.pilot-main { padding: clamp(28px, 4.4vw, 64px); }
+.pilot-main .h2 { max-width: 15ch; }
+.pilot-main .intro b { color: var(--ink); font-weight: 620; }
+.qual { margin-top: clamp(28px, 3vw, 40px); padding-top: 22px; border-top: 1px solid var(--line); display: grid; gap: 12px; color: var(--ink-2); font-size: 15px; max-width: 60ch; }
+.qual b { color: var(--ink); font-weight: 620; }
+.how { background: var(--sunk); border-left: 1px solid var(--line); padding: clamp(28px, 3.6vw, 52px); }
+.how h3 { font-size: 18px; letter-spacing: -.01em; }
+.how ol { list-style: none; margin: 20px 0 0; padding: 0; counter-reset: how; }
+.how li { counter-increment: how; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); font-size: 14.5px; color: var(--ink-2); }
+.how li::before { content: counter(how); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line-2); font-family: var(--mono); font-stretch: 87.5%; font-size: 11.5px; color: var(--ink); }
+.how li b { display: block; color: var(--ink); font-weight: 600; }
+.how li.opt::before { border-style: dashed; }
+@media (max-width: 960px) {
+  .pilot-card { grid-template-columns: minmax(0, 1fr); }
+  .how { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* ---------- Footer ---------- */
+.foot { border-top: 1px solid var(--line); padding: clamp(40px, 5vw, 56px) 0 36px; }
+.foot-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px 48px; }
+.foot-line { margin-top: 12px; color: var(--muted); max-width: 44ch; font-size: 15px; }
+.foot-links { display: grid; gap: 8px; font-size: 15px; }
+.foot-links a { color: var(--ink-2); text-underline-offset: 4px; text-decoration-color: var(--line-2); }
+.foot-bottom { margin-top: 36px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; color: var(--muted); font-size: 13.5px; }
+.foot-bottom a { color: inherit; }
+
+/* Reduced motion: final states, no transitions that travel. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="g1" x1="49.995%" x2="49.995%" y1="122.45%" y2="31.139%"><stop offset="0%" stop-color="#fff100"/><stop offset="100%" stop-color="#f05a28"/></linearGradient></defs><symbol id="l-datadog" viewBox="0 0 256 275"><path fill="#632ca6" d="m214.434 194.558l-22.796-15.039l-19.016 31.766l-22.118-6.465l-19.474 29.723l.997 9.355l105.89-19.513l-6.15-66.163zm-98.745-28.523l16.99-2.336c2.748 1.235 4.66 1.706 7.956 2.544c5.136 1.334 11.074 2.617 19.872-1.814c2.047-1.015 6.314-4.915 8.038-7.14l69.605-12.624l7.1 85.94l-119.252 21.49zm129.293-30.967l-6.871 1.309L224.91 0L0 26.078l27.71 224.856l26.33-3.822c-2.104-3.002-5.378-6.634-10.967-11.282c-7.752-6.44-5.014-17.384-.436-24.294c6.051-11.674 37.23-26.51 35.463-45.168c-.634-6.785-1.71-15.613-8.011-21.669c-.238 2.514.19 4.928.19 4.928s-2.587-3.3-3.874-7.795c-1.279-1.728-2.285-2.277-3.646-4.583c-.971 2.665-.842 5.757-.842 5.757s-2.116-4.997-2.457-9.216c-1.253 1.887-1.568 5.472-1.568 5.472s-2.747-7.878-2.12-12.124c-1.253-3.692-4.972-11.022-3.922-27.676c6.862 4.807 21.975 3.667 27.861-5.01c1.953-2.876 3.296-10.72-.976-26.182c-2.742-9.912-9.532-24.674-12.18-30.276l-.315.23c1.396 4.512 4.272 13.967 5.378 18.558c3.343 13.907 4.237 18.753 2.669 25.167c-1.335 5.576-4.535 9.22-12.646 13.298c-8.111 4.09-18.879-5.865-19.557-6.414c-7.882-6.28-13.98-16.52-14.658-21.5c-.709-5.446 3.14-8.716 5.079-13.168c-2.777.79-5.87 2.202-5.87 2.202s3.693-3.822 8.245-7.126c1.888-1.248 2.993-2.043 4.98-3.693c-2.876-.047-5.213.035-5.213.035s4.798-2.592 9.77-4.48c-3.637-.159-7.122-.025-7.122-.025S48 36.288 56.454 32.777c5.813-2.384 11.492-1.68 14.684 2.937c4.19 6.046 8.59 9.329 17.915 11.363c5.727-2.54 7.464-3.84 14.66-5.805c6.33-6.966 11.302-7.865 11.302-7.865s-2.466 2.264-3.127 5.818c3.59-2.829 7.524-5.191 7.524-5.191s-1.525 1.878-2.946 4.867l.328.493c4.19-2.514 9.113-4.492 9.113-4.492s-1.408 1.78-3.057 4.081c3.161-.026 9.566.134 12.054.415c14.68.324 17.725-15.674 23.357-17.682c7.053-2.518 10.206-4.043 22.226 7.765c10.31 10.141 18.368 28.281 14.365 32.345c-3.356 3.374-9.973-1.317-17.307-10.456c-3.874-4.841-6.806-10.564-8.18-17.837c-1.157-6.138-5.666-9.696-5.666-9.696s2.613 5.83 2.613 10.965c0 2.808.35 13.299 4.85 19.19c-.445.86-.652 4.258-1.145 4.91c-5.234-6.327-16.477-10.853-18.312-12.188c6.206 5.084 20.468 16.762 25.944 27.961c5.183 10.586 2.13 20.291 4.75 22.8c.748.717 11.144 13.674 13.144 20.183c3.49 11.342.207 23.267-4.358 30.66l-12.754 1.987c-1.866-.518-3.123-.777-4.794-1.744c.924-1.633 2.755-5.701 2.772-6.544l-.72-1.26c-3.97 5.622-10.617 11.082-16.14 14.217c-7.23 4.099-15.562 3.464-20.987 1.788c-15.393-4.746-29.952-15.15-33.463-17.885c0 0-.108 2.181.552 2.674c3.879 4.38 12.772 12.296 21.37 17.82l-18.325 2.017l8.664 67.45c-3.84.548-4.44.82-8.642 1.416c-3.706-13.09-10.793-21.638-18.542-26.618c-6.832-4.392-16.256-5.381-25.274-3.593l-.58.674c6.272-.652 13.675.255 21.28 5.07c7.464 4.721 13.48 16.914 15.696 24.251c2.837 9.381 4.798 19.419-2.838 30.056c-5.429 7.563-21.28 11.74-34.09 2.7c3.421 5.502 8.042 9.998 14.27 10.845c9.243 1.257 18.015-.35 24.053-6.548c5.152-5.3 7.89-16.382 7.17-28.052l8.158-1.183l2.946 20.947L256 242.542zm-82.156-56.885c-.376.859-.972 1.425-.082 4.223l.052.16l.143.363l.371.838c1.602 3.278 3.36 6.366 6.306 7.947q1.14-.196 2.367-.255c2.764-.12 4.509.315 5.61.911c.1-.552.12-1.356.06-2.543c-.216-4.151.821-11.208-7.156-14.923c-3.01-1.395-7.235-.967-8.643.778c.255.034.484.086.666.147c2.133.738.69 1.472.306 2.354m22.364 38.724c-1.045-.58-5.934-.35-9.372.06c-6.548.773-13.618 3.04-15.164 4.25c-2.816 2.177-1.538 5.969.544 7.528c5.835 4.358 10.949 7.282 16.343 6.57c3.313-.437 6.237-5.685 8.306-10.444c1.416-3.278 1.416-6.815-.657-7.964m-57.965-33.59c1.844-1.753-9.195-4.055-17.764 1.789c-6.319 4.31-6.522 13.553-.471 18.792a15 15 0 0 0 1.568 1.188a51 51 0 0 1 6.098-2.423c3.913-1.27 7.17-1.927 9.843-2.277c1.279-1.43 2.769-3.947 2.397-8.508c-.51-6.19-5.191-5.209-1.671-8.56"/></symbol><symbol id="l-grafana" viewBox="0 0 256 279"><path fill="url(#g1)" d="M255.59 122.775c-.46-4.675-1.226-10.04-2.759-16.017a98 98 0 0 0-7.204-19.16a106.7 106.7 0 0 0-13.412-20.54c-2.222-2.681-4.675-5.287-7.28-7.816c3.908-15.558-4.752-29.046-4.752-29.046c-14.945-.92-24.448 4.675-27.973 7.204c-.613-.23-1.15-.537-1.763-.767c-2.529-.996-5.135-1.992-7.894-2.835a130 130 0 0 0-8.277-2.3c-2.835-.69-5.67-1.226-8.583-1.686c-.537-.076-.996-.153-1.533-.23C157.646 8.738 138.946 0 138.946 0c-20.922 13.258-24.831 31.805-24.831 31.805s-.077.383-.23 1.073c-1.15.307-2.299.69-3.449.996c-1.609.46-3.218 1.073-4.751 1.686a123 123 0 0 0-4.752 1.916a117 117 0 0 0-9.35 4.599c-2.989 1.686-5.9 3.525-8.737 5.441l-.766-.307c-28.97-11.036-54.643 2.223-54.643 2.223c-2.376 30.809 11.572 50.198 14.331 53.724c-.69 1.916-1.303 3.832-1.916 5.748c-2.146 6.974-3.755 14.101-4.751 21.535c-.154 1.073-.307 2.146-.384 3.219C7.894 146.916 0 173.97 0 173.97c22.302 25.674 48.359 27.283 48.359 27.283l.077-.076c3.295 5.9 7.127 11.495 11.419 16.783a112 112 0 0 0 5.671 6.362c-8.124 23.298 1.15 42.61 1.15 42.61c24.83.92 41.155-10.882 44.603-13.564a85 85 0 0 0 7.511 2.222a109.7 109.7 0 0 0 23.298 3.449c1.916.076 3.909.153 5.825.076h2.759l1.226-.076v.076c11.726 16.708 32.265 19.084 32.265 19.084c14.638-15.405 15.48-30.733 15.48-34.028v-1.38c3.066-2.145 5.979-4.445 8.738-6.974c5.824-5.288 10.959-11.342 15.25-17.857l1.15-1.839c16.554.92 28.28-10.27 28.28-10.27c-2.759-17.243-12.569-25.673-14.638-27.283c0 0-.077-.076-.23-.153s-.153-.153-.153-.153c-.077-.077-.23-.154-.383-.23c.076-1.073.153-2.07.23-3.142c.153-1.84.153-3.756.153-5.595v-2.913l-.077-1.149l-.076-1.533c0-.536-.077-.996-.154-1.456c-.076-.46-.076-.996-.153-1.456l-.153-1.456l-.23-1.456c-.307-1.916-.613-3.756-1.073-5.672c-1.763-7.433-4.675-14.484-8.43-20.845a70.4 70.4 0 0 0-14.025-16.707c-5.365-4.752-11.42-8.584-17.704-11.42c-6.36-2.835-12.952-4.675-19.543-5.518c-3.295-.46-6.59-.613-9.886-.536h-2.453l-1.226.077c-.46 0-.92.076-1.303.076a52 52 0 0 0-4.981.69c-6.591 1.226-12.799 3.602-18.24 6.897s-10.193 7.358-14.025 11.956a54.7 54.7 0 0 0-8.89 15.021a52.9 52.9 0 0 0-3.525 16.094c-.077 1.303-.077 2.683-.077 3.986v.996l.077 1.073c.076.613.076 1.303.153 1.916c.23 2.682.766 5.288 1.456 7.74c1.456 4.982 3.755 9.503 6.59 13.335s6.285 6.975 9.887 9.504c3.602 2.452 7.51 4.215 11.343 5.364c3.832 1.15 7.664 1.61 11.266 1.61h1.993c.23 0 .46 0 .689-.077c.383 0 .766-.077 1.15-.077c.076 0 .23 0 .306-.076l.383-.077c.23 0 .46-.076.69-.076c.46-.077.843-.154 1.303-.23s.843-.154 1.226-.307c.843-.153 1.61-.46 2.376-.69c1.533-.536 3.066-1.15 4.368-1.839c1.38-.69 2.606-1.533 3.832-2.3c.307-.23.69-.459.997-.766c1.226-.996 1.456-2.835.46-4.061c-.844-1.073-2.376-1.38-3.603-.69l-.92.46a25 25 0 0 1-3.295 1.38c-1.15.382-2.375.689-3.602.919c-.613.076-1.226.153-1.916.23c-.306 0-.613.076-.996.076h-1.84c-.383 0-.766 0-1.149-.076h-.46c-.153 0-.383 0-.536-.077c-.383-.077-.69-.077-1.073-.153c-2.836-.383-5.671-1.226-8.354-2.453a29.3 29.3 0 0 1-7.74-5.058c-2.376-2.146-4.445-4.675-6.055-7.587s-2.759-6.131-3.295-9.503c-.23-1.686-.383-3.449-.307-5.135c0-.46.077-.92.077-1.38v-.613c0-.23.077-.46.077-.69c.076-.919.23-1.839.383-2.758c1.303-7.358 4.981-14.562 10.653-20.003c1.456-1.38 2.988-2.606 4.598-3.755a31.7 31.7 0 0 1 5.211-2.99a36 36 0 0 1 5.672-2.068c1.915-.537 3.908-.844 5.977-1.073c.997-.077 1.993-.154 3.066-.154h2.376l.843.077c2.222.153 4.368.46 6.514.996c4.292.92 8.507 2.53 12.415 4.675c7.818 4.369 14.485 11.113 18.547 19.237c2.07 4.061 3.525 8.43 4.215 12.951c.153 1.15.307 2.3.383 3.45l.077.842l.077.843v3.296c0 .536-.077 1.456-.077 1.992c-.077 1.227-.23 2.53-.383 3.756s-.383 2.452-.613 3.678a50 50 0 0 1-.843 3.602a64 64 0 0 1-2.3 7.128a62.4 62.4 0 0 1-7.204 13.105c-5.9 8.124-13.948 14.715-23.144 18.93c-4.599 2.069-9.427 3.602-14.408 4.368c-2.453.46-4.982.69-7.511.766h-3.832a36 36 0 0 1-4.062-.23c-5.365-.383-10.653-1.379-15.864-2.835c-5.135-1.456-10.116-3.525-14.868-5.978c-9.427-5.058-17.933-11.956-24.524-20.31a79 79 0 0 1-8.584-13.334a79 79 0 0 1-5.671-14.638c-1.38-5.058-2.223-10.193-2.606-15.405l-.077-.996v-6.821c.077-2.529.307-5.211.614-7.817c.306-2.606.766-5.288 1.302-7.894c.537-2.605 1.15-5.211 1.916-7.817a103 103 0 0 1 5.442-14.791c4.368-9.35 10.04-17.704 16.86-24.371c1.686-1.686 3.449-3.22 5.288-4.752a78 78 0 0 1 5.748-4.138c1.916-1.303 3.985-2.453 6.055-3.526a40 40 0 0 1 3.142-1.533l3.219-1.379c2.146-.92 4.368-1.686 6.667-2.376c.537-.153 1.15-.306 1.686-.536c.537-.154 1.15-.307 1.686-.46c1.15-.307 2.3-.613 3.45-.843c.536-.153 1.149-.23 1.762-.383c.613-.154 1.15-.23 1.763-.384c.613-.076 1.15-.23 1.762-.306l.843-.153l.92-.154c.613-.076 1.15-.153 1.763-.23c.69-.076 1.302-.153 1.992-.23c.537-.076 1.456-.153 1.993-.23c.383-.076.843-.076 1.226-.153l.843-.076l.383-.077h.46c.69-.077 1.303-.077 1.993-.153l.996-.077h.767c.536 0 1.149-.076 1.685-.076a99 99 0 0 1 6.745 0c4.445.153 8.813.69 13.028 1.456c8.507 1.61 16.478 4.291 23.758 7.893c7.28 3.526 13.719 7.894 19.39 12.646c.383.306.69.613 1.073.92c.306.306.69.613.996.92c.69.612 1.303 1.225 1.993 1.838c.69.614 1.303 1.227 1.916 1.84a44 44 0 0 1 1.839 1.916c2.376 2.529 4.598 5.058 6.59 7.664a99 99 0 0 1 9.734 15.25l.46.92l.46.92c.306.613.613 1.226.843 1.84c.306.613.536 1.149.843 1.762c.23.613.536 1.15.766 1.763c.92 2.299 1.84 4.521 2.53 6.59c1.149 3.373 1.992 6.362 2.682 8.967a2.043 2.043 0 0 0 2.299 1.61c1.15-.077 1.992-.996 1.992-2.146c.077-2.759 0-6.054-.383-9.81"/></symbol></svg>
+<div class="frame" aria-hidden="true"></div>
+
+<header class="nav" data-nav>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="mycroftcompute, back to top">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+      mycroftcompute
+    </a>
+    <nav class="nav-links" aria-label="Page">
+      <a href="#findings">What it finds</a>
+      <a href="#cache">The cache</a>
+      <a href="#app">The command</a>
+      <a href="#install">Install</a>
+    </nav>
+    <div class="nav-end">
+      <button class="icon-btn theme-btn" type="button" data-theme-toggle aria-label="Switch colour theme">
+        <span class="sun"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><path d="M12 2V4"/><path d="M12 20V22"/><path d="M4 12L2 12"/><path d="M22 12L20 12"/><path d="M19.7778 4.22266L17.5558 6.25424"/><path d="M4.22217 4.22266L6.44418 6.25424"/><path d="M6.44434 17.5557L4.22211 19.7779"/><path d="M19.7778 19.7773L17.5558 17.5551"/></g></svg></span><span class="moon"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 22C17.5228 22 22 17.5228 22 12C22 11.5373 21.3065 11.4608 21.0672 11.8568C19.9289 13.7406 17.8615 15 15.5 15C11.9101 15 9 12.0899 9 8.5C9 6.13845 10.2594 4.07105 12.1432 2.93276C12.5392 2.69347 12.4627 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/></svg></span>
+      </button>
+      <details class="menu" data-menu>
+        <summary class="icon-btn" aria-label="Menu"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <nav class="menu-panel" aria-label="Page">
+          <a href="#findings">What it finds</a>
+          <a href="#cache">The cache</a>
+          <a href="#app">The command</a>
+          <a href="#install">Install</a>
+          <a href="#faq">Questions</a>
+        </nav>
+      </details>
+      <a class="btn btn-sm" href="https://github.com/negi6711/mycroftcompute" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ Hero ============ -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <p class="status"><span class="pulse" aria-hidden="true"></span><span><b>Open source</b> command-line tool. MIT licensed.</span></p>
+    <h1 class="h1" data-split data-hero>Where your Claude Code money goes, <span class="soft">and what’s worth changing.</span></h1>
+
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="lede">A command-line tool that reads your Claude Code history, or your team’s Grafana or Datadog telemetry, prices every token <strong>with the prompt cache counted</strong>, and prints a plain report: where the money went, which changes are worth making, and what the data cannot tell you.</p>
+        <p class="mail-alt install-line">
+          <span class="addr">uvx mycroftcompute</span>
+          <button class="chip" type="button" data-copy="uvx mycroftcompute" data-copy-said="Command copied"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z"/><path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5"/></g></svg><span>Copy</span></button>
+        </p>
+        <div class="ctas">
+          <a class="btn" href="https://github.com/negi6711/mycroftcompute" rel="noopener">View on GitHub <svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M18 15V6H9"/></svg></a>
+          <a class="link" href="#findings"><span>See what it finds</span></a>
+        </div>
+        <p class="readonly"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M3 10.4167C3 7.21907 3 5.62028 3.37752 5.08241C3.75503 4.54454 5.25832 4.02996 8.26491 3.00079L8.83772 2.80472C10.405 2.26824 11.1886 2 12 2C12.8114 2 13.595 2.26824 15.1623 2.80472L15.7351 3.00079C18.7417 4.02996 20.245 4.54454 20.6225 5.08241C21 5.62028 21 7.21907 21 10.4167C21 10.8996 21 11.4234 21 11.9914C21 17.6294 16.761 20.3655 14.1014 21.5273C13.38 21.8424 13.0193 22 12 22C10.9807 22 10.62 21.8424 9.89856 21.5273C7.23896 20.3655 3 17.6294 3 11.9914C3 11.4234 3 10.8996 3 10.4167Z"/><path stroke-linejoin="round" d="M9.5 12.4L10.9286 14L14.5 10"/></g></svg><span>Runs on your machine and uploads nothing. Python 3.12 or later, no dependencies.</span></p>
+        <div class="works">
+          <span class="works-label">Works with</span>
+          <ul>
+            <li><span class="tile"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M3 10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H13C16.7712 2 18.6569 2 19.8284 3.17157C21 4.34315 21 6.22876 21 10V14C21 17.7712 21 19.6569 19.8284 20.8284C18.6569 22 16.7712 22 13 22H11C7.22876 22 5.34315 22 4.17157 20.8284C3 19.6569 3 17.7712 3 14V10Z"/><path d="M8 12H16"/><path d="M8 8H16"/><path d="M8 16H13"/></g></svg></span>Claude Code history</li>
+            <li><span class="tile"><svg class="logo" viewBox="0 0 256 279" aria-hidden="true" focusable="false"><use href="#l-grafana"/></svg></span>Grafana Cloud</li>
+            <li><span class="tile"><svg class="logo" viewBox="0 0 256 275" aria-hidden="true" focusable="false"><use href="#l-datadog"/></svg></span>Datadog</li>
+          </ul>
+        </div>
+      </div>
+
+      <figure class="win hero-win" data-hero-win aria-label="A mycroftcompute report for a sample team: where its Claude Code money went in August 2026" style="margin:0">
+        <div class="win-bar">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+          <span class="crumb"><b>Sample team</b> / Reports / 1 to 28 Aug 2026</span>
+          <span class="tag">Sample</span>
+        </div>
+        <div class="pane">
+          <div class="rep-top">
+            <div>
+              <p class="rep-title">Anthropic usage, 1 to 28 August 2026</p>
+              <p class="rep-total">$15,365.62<small>at list prices</small></p>
+            </div>
+            <div class="rep-meta"><span class="meta-pill">24 developers</span><span class="meta-pill">4 findings</span></div>
+          </div>
+          <div class="rep-cols">
+            <div data-reveal-hero>
+              <p class="cap">By model</p>
+              <div class="bar" aria-hidden="true"><span class="c2" style="width:87.2%" data-bar></span><span class="c1" style="width:12.8%" data-bar></span></div>
+              <ul class="rows">
+                <li><i class="c2"></i><span class="who">claude-opus-5</span><span class="num">$13,398.84</span></li>
+                <li><i class="c1"></i><span class="who">claude-sonnet-5</span><span class="num">$1,966.78</span></li>
+              </ul>
+            </div>
+            <div data-reveal-hero>
+              <p class="cap">By request kind</p>
+              <div class="bar" aria-hidden="true"><span class="c1" style="width:75.7%" data-bar></span><span class="c3" style="width:12.8%" data-bar></span><span class="c2" style="width:11.5%" data-bar></span></div>
+              <ul class="rows">
+                <li><i class="c1"></i><span class="who">main</span><span class="num">$11,631.10</span></li>
+                <li><i class="c3"></i><span class="who">subagent</span><span class="num">$1,966.78</span></li>
+                <li><i class="c2"></i><span class="who">auxiliary <small>housekeeping</small></span><span class="num">$1,767.74</span></li>
+              </ul>
+            </div>
+            <div data-reveal-hero>
+              <p class="cap">By developer</p>
+              <div class="bar" aria-hidden="true"><span class="c2" style="width:14.1%" data-bar></span><span class="c2" style="width:13.7%" data-bar></span><span class="c2" style="width:11.7%" data-bar></span><span class="c3" style="width:60.5%" data-bar></span></div>
+              <ul class="rows">
+                <li><i class="c2"></i><span class="who">priya@example.com</span><span class="num">$2,168.54</span></li>
+                <li><i class="c2"></i><span class="who">marco@example.com</span><span class="num">$2,106.58</span></li>
+                <li><i class="c2"></i><span class="who">sven@example.com</span><span class="num">$1,796.79</span></li>
+                <li><i class="c3"></i><span class="who">21 more <small>median $464.69</small></span><span class="num dim"></span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="win-foot">
+          <span>Four findings. The largest ceiling is <b>at most $5,884.62</b> over the month.</span>
+          <a href="#findings">Read the findings</a>
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ What a report finds ============ -->
+<section class="section" id="findings" aria-labelledby="findings-h" style="padding-top:0">
+  <div class="wrap">
+    <p class="label"><b>01</b>What a report finds</p>
+    <div class="head-row">
+      <h2 class="h2" id="findings-h" data-split>Four findings on a $15,365.62 month.</h2>
+      <p class="intro" data-reveal>Each dollar figure is the most a change could be worth, never a promise. The ceilings overlap, so they are never added up. Every finding ends with what your data cannot tell you.</p>
+    </div>
+
+    <div class="findings-win">
+      <div class="win" data-findings-win>
+        <div class="win-bar">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+          <span class="crumb"><b>Sample team</b> / 1 to 28 Aug 2026 / Findings</span>
+          <span class="tag">Sample</span>
+        </div>
+        <div class="fw-body" data-findings>
+          <ol class="f-list" aria-label="Findings in this report">
+            <li><a class="f-item" href="#f-1" data-f="1"><span class="find-no">1</span><span class="t">39.5% of agent spend went to three developers</span><span class="c attr">Attribution, not a lever</span></a></li>
+            <li><a class="f-item" href="#f-2" data-f="2" aria-current="true"><span class="find-no">2</span><span class="t">11.5% of spend is the agent’s own housekeeping, on claude-opus-5</span><span class="c">At most $942.80</span></a></li>
+            <li><a class="f-item" href="#f-3" data-f="3"><span class="find-no">3</span><span class="t">Moving claude-opus-5 to claude-haiku-4-5 would pay off, but not immediately</span><span class="c">At most $5,884.62</span></a></li>
+            <li><a class="f-item" href="#f-4" data-f="4"><span class="find-no">4</span><span class="t">26.6% of your bill went on writing the prompt cache</span><span class="c">At most $3,764.64</span></a></li>
+          </ol>
+          <div class="f-details">
+            <article class="f-detail is-open" id="f-2" data-fd="2">
+              <div class="fd-head"><span class="find-no">2</span><div><h3>11.5% of spend is the agent’s own housekeeping, on claude-opus-5</h3><span class="tag fast">Fastest to act on: one settings change</span></div></div>
+              <ul class="fd-shows">
+                <li>$1,767.74 of $15,365.62, 11.5%, went to requests the agent raised for itself or marked as needing low effort.</li>
+                <li>No cache on claude-opus-5 for this traffic, so moving it to claude-haiku-4-5 costs nothing to switch.</li>
+              </ul>
+              <div class="ceiling"><b>At most $942.80</b><span>over this period. A ceiling, not a saving.</span></div>
+              <p class="fd-next"><b>Next</b>Check what model your agent uses for auxiliary and low-effort requests. If it is claude-opus-5, point it at claude-haiku-4-5 and leave the main path alone.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>Whether your agent lets you choose a model for this traffic separately from the main one.</p>
+            </article>
+            <article class="f-detail" id="f-1" data-fd="1">
+              <div class="fd-head"><span class="find-no">1</span><div><h3>39.5% of agent spend went to three developers</h3></div></div>
+              <ul class="fd-shows">
+                <li>24 developers ran agents in this period, for $15,365.62 in total. The top three account for $6,071.90, 39.5% of everything.</li>
+              </ul>
+              <ul class="devs" aria-label="Spend by developer">
+                <li><span class="who">priya@example.com</span><span class="track"><span class="fill" style="width:100%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$2,168.54</span></li>
+                <li><span class="who">marco@example.com</span><span class="track"><span class="fill" style="width:97.1%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$2,106.58</span></li>
+                <li><span class="who">sven@example.com</span><span class="track"><span class="fill" style="width:82.9%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$1,796.79</span></li>
+                <li><span class="who">ana@example.com</span><span class="track"><span class="fill" style="width:31%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$671.21</span></li>
+                <li><span class="who">ben@example.com</span><span class="track"><span class="fill" style="width:28.6%" data-bar></span><span class="median" style="left:21.4%"></span></span><span class="num">$619.58</span></li>
+              </ul>
+              <p class="devs-note">The vertical line is the team median, $464.69.</p>
+              <div class="ceiling attr"><b>Attribution, not a lever</b><span>This finding says where the money went, not that it went somewhere wrong.</span></div>
+              <p class="fd-next"><b>Next</b>Ask priya@example.com what they have been running agents on. The useful outcome is usually a technique worth spreading rather than a habit worth stopping.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>Whether any of this is a problem. Spend follows work, and the most expensive developer on a team is frequently the most productive one.</p>
+            </article>
+            <article class="f-detail" id="f-3" data-fd="3">
+              <div class="fd-head"><span class="find-no">3</span><div><h3>Moving claude-opus-5 to claude-haiku-4-5 would pay off, but not immediately</h3></div></div>
+              <ul class="fd-shows">
+                <li>claude-opus-5 is 87.2% of spend, $13,398.84.</li>
+                <li>Once each session’s cache is warm on claude-haiku-4-5, the same tokens would cost $5,884.62 less over this period. The first request of every session that moves pays to write its cache again, and daily totals do not count sessions, so that cost is not subtracted here.</li>
+              </ul>
+              <div class="ceiling"><b>At most $5,884.62</b><span>over this period. A ceiling, not a saving.</span></div>
+              <p class="fd-next"><b>Next</b>Try the cheaper model in one repository for a week before changing anything broadly. Routing at session boundaries preserves the cache; switching mid-session destroys it and costs more than it saves.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>Whether the cheaper model would do the work. This compares what the same tokens would cost; it is not a judgement about output quality.</p>
+            </article>
+            <article class="f-detail" id="f-4" data-fd="4">
+              <div class="fd-head"><span class="find-no">4</span><div><h3>26.6% of your bill went on writing the prompt cache</h3></div></div>
+              <ul class="fd-shows">
+                <li>811,852,800 tokens were written to the prompt cache, costing $4,092.00 at the five-minute write rate. At the one-hour rate the same writes would cost $6,547.20.</li>
+                <li>15,713,280,000 tokens were read back from cache, about 19.4 reads for every token written.</li>
+              </ul>
+              <div class="ceiling"><b>At most $3,764.64</b><span>over this period. A ceiling, not a saving.</span></div>
+              <p class="fd-next"><b>Next</b>Look for what rewrites a warm prefix: sessions restarted or cleared often, tools or MCP servers that change mid-session, model switches inside a session, and long pauses.</p>
+              <p class="fd-cannot"><b>What your metrics backend cannot tell you</b>How many of these writes were a warm prefix written again and how many were new context that had to be written once. Only the first kind can be avoided.</p>
+            </article>
+          </div>
+        </div>
+        <div class="win-foot">
+          <span class="price-note"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg>Prices checked against each vendor’s own pricing page on 24 Sep 2026.</span>
+          <span>Did not run: repository concentration. Claude Code does not emit a repository label.</span>
+        </div>
+      </div>
+      <p class="sample-note">Sample report for an invented team. The arithmetic is real.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ The cache ============ -->
+<section class="section" id="cache" aria-labelledby="cache-h">
+  <div class="wrap">
+    <p class="label"><b>02</b>The prompt cache</p>
+    <div class="head-row">
+      <h2 class="h2" id="cache-h" data-split>On Claude Code, the cache money is in the writes.</h2>
+      <p class="intro" data-reveal>The cache already works, so “turn caching on” is not the saving. Writing it is what costs: every write is billed above list price, 1.25x for five minutes and 2x for an hour.</p>
+    </div>
+
+    <div class="cache-grid">
+    <div>
+    <div class="meters">
+      <div class="meter" data-reveal>
+        <p class="meter-k">On the author’s own Claude Code usage</p>
+        <b class="meter-v">40.7%</b>
+        <p class="meter-l">of the bill went on writing the cache, at the five-minute rate, while about 96% of input was read from cache.</p>
+        <div class="meter-bar" aria-hidden="true"><span style="width:40.7%" data-bar></span></div>
+        <p class="meter-sub">One developer over two days, read live from Grafana Cloud, 24 and 25 September 2026.</p>
+      </div>
+      <div class="meter" data-reveal>
+        <p class="meter-k">In the sample team</p>
+        <b class="meter-v">26.6%</b>
+        <p class="meter-l">of the bill: $4,092.00 at the five-minute rate, $6,547.20 at the one-hour rate.</p>
+        <div class="meter-bar" aria-hidden="true"><span style="width:26.6%" data-bar></span></div>
+        <p class="meter-sub">Finding 4 above, at most $3,764.64 over the month.</p>
+      </div>
+    </div>
+
+    <div class="causes" data-reveal>
+      <span class="causes-k">A warm cache gets rewritten by</span>
+      <span class="cz">new sessions</span><span class="cz">compactions</span><span class="cz">model switches</span><span class="cz">tools or MCP servers changing mid-session</span><span class="cz">long pauses</span>
+    </div>
+    <p class="cache-claim" data-reveal>Mycroft shows what share of your bill went on <b>writing the cache</b>, and the most that fewer rewrites could be worth.</p>
+    </div>
+
+    <div class="switch">
+      <div class="switch-copy">
+        <h3 data-split>The cheaper model isn’t always cheaper.</h3>
+        <p data-reveal>A model switch is one of those rewrites. On a typical agent step the cheaper model costs 3.9x more on the first request, pays back by the sixth, and is 9.4x worse if you keep switching. Every router and dashboard compares list prices; <b>Mycroft counts the cache</b> before it suggests any model change.</p>
+      </div>
+
+      <figure class="instrument" data-instrument data-x0="64" data-x1="696" data-y0="352" data-ytop="40" data-vmax="0.5" data-stay="0.045276" data-first="0.177242" data-warm="0.015092" data-alt="0.425976">
+        <div class="inst-head">
+          <p class="inst-title">Moving a coding agent from Sonnet 4.6 to Haiku 4.5<span>Cumulative input cost, requests after the switch</span></p>
+          <ul class="legend" aria-hidden="true">
+            <li class="s-stay"><i></i>Stay on Sonnet 4.6</li>
+            <li class="s-switch"><i></i>Switch to Haiku 4.5</li>
+            <li class="s-alt"><i></i>Alternate every request</li>
+          </ul>
+        </div>
+        <div class="plot" data-plot>
+          <svg viewBox="0 0 720 400" role="img" aria-labelledby="chart-t chart-d">
+            <title id="chart-t">Cumulative input cost over ten requests after a model switch</title>
+            <desc id="chart-d">Staying on Sonnet 4.6 costs $0.045 per request. Switching to Haiku 4.5 costs $0.177 on the first request, 3.9 times more, then $0.015 per request, so it pulls ahead on request 6 and reaches $0.313 by request 10 against $0.453 for staying. Alternating costs $0.426 every request and reaches $4.260 by request 10, far off this scale.</desc>
+            <defs>
+              <clipPath id="plot-clip"><rect x="40" y="0" width="680" height="360"/></clipPath>
+            </defs>
+            <g aria-hidden="true">
+              <text class="gt" x="52" y="356.0" text-anchor="end">$0.00</text><line class="gl" x1="64" x2="696" y1="289.6" y2="289.6"/><text class="gt" x="52" y="293.6" text-anchor="end">$0.10</text><line class="gl" x1="64" x2="696" y1="227.2" y2="227.2"/><text class="gt" x="52" y="231.2" text-anchor="end">$0.20</text><line class="gl" x1="64" x2="696" y1="164.8" y2="164.8"/><text class="gt" x="52" y="168.8" text-anchor="end">$0.30</text><line class="gl" x1="64" x2="696" y1="102.4" y2="102.4"/><text class="gt" x="52" y="106.4" text-anchor="end">$0.40</text><line class="gl" x1="64" x2="696" y1="40.0" y2="40.0"/><text class="gt" x="52" y="44.0" text-anchor="end">$0.50</text><text class="gt" x="127.2" y="376" text-anchor="middle">1</text><text class="gt" x="190.4" y="376" text-anchor="middle">2</text><text class="gt" x="253.6" y="376" text-anchor="middle">3</text><text class="gt" x="316.8" y="376" text-anchor="middle">4</text><text class="gt" x="380.0" y="376" text-anchor="middle">5</text><text class="gt" x="443.2" y="376" text-anchor="middle">6</text><text class="gt" x="506.4" y="376" text-anchor="middle">7</text><text class="gt" x="569.6" y="376" text-anchor="middle">8</text><text class="gt" x="632.8" y="376" text-anchor="middle">9</text><text class="gt" x="696.0" y="376" text-anchor="middle">10</text>
+              <line class="gb" x1="64" x2="696" y1="352" y2="352"/>
+              <text class="axis-note" x="696" y="398" text-anchor="end">requests after the switch</text>
+              <g clip-path="url(#plot-clip)">
+                <path class="series alt" d="M64.0 352.0 L127.2 86.2 L143.4 18.2" data-line/>
+                <path class="series stay" d="M64.0 352.0 L127.2 323.7 L190.4 295.5 L253.6 267.2 L316.8 239.0 L380.0 210.7 L443.2 182.5 L506.4 154.2 L569.6 126.0 L632.8 97.7 L696.0 69.5" data-line/>
+                <path class="series switch" d="M64.0 352.0 L127.2 241.4 L190.4 232.0 L253.6 222.6 L316.8 213.1 L380.0 203.7 L443.2 194.3 L506.4 184.9 L569.6 175.5 L632.8 166.1 L696.0 156.6" data-line/>
+              </g>
+              <g data-alt-note>
+                <path d="M143.4 18.2 l-5 9 m5 -9 l6 7" stroke="currentColor" class="s-alt" fill="none" stroke-width="2" stroke-linecap="round"/>
+                <text class="alt-note" x="150" y="30">Alternating: $4.26 by request 10, off this scale</text>
+              </g>
+              <g data-pay>
+                <circle class="pay-ring" cx="403.5" cy="200.2" r="5.5"/>
+                <text class="pay-note" x="403.5" y="200.2" dx="0" dy="34" text-anchor="middle">Ahead from request 6</text>
+              </g>
+              <g data-guide>
+                <line class="guide" x1="443.2" x2="443.2" y1="40" y2="352"/>
+                <circle class="dot stay" cx="443.2" cy="182.5" r="6"/>
+                <circle class="dot switch" cx="443.2" cy="194.3" r="6"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="readout" aria-hidden="true">
+          <div class="s-stay"><span class="ro-k"><i></i>Stay</span><span class="ro-v" data-ro="stay">$0.272</span></div>
+          <div class="s-switch"><span class="ro-k"><i></i>Switch</span><span class="ro-v" data-ro="switch">$0.253</span></div>
+          <div class="s-alt"><span class="ro-k"><i></i>Alternate</span><span class="ro-v" data-ro="alt">$2.556</span></div>
+        </div>
+        <div class="scrubber">
+          <span class="scrub-n" aria-hidden="true">Request <b data-ro="n">6</b> of 10</span>
+          <p class="verdict-line" data-ro="verdict">Switching is <b>ahead by $0.019</b>. It overtook staying on request 6.</p>
+          <label class="sr-only" for="scrub">Requests after the switch</label>
+          <input class="scrub scrub-row" id="scrub" type="range" min="1" max="10" step="1" value="6" data-scrub>
+        </div>
+        <figcaption class="inst-foot">One coding-agent step at list prices: about 141,000 cached prompt tokens and 1,000 fresh ones, from published coding-agent workload research. Five-minute cache.</figcaption>
+      </figure>
+    </div>
+    </div>
+
+    <div class="check" id="check">
+      <div class="check-copy" data-reveal>
+        <span class="tag">Free, two minutes</span>
+        <h3>What share of <em>your</em> bill went on writing the cache?</h3>
+        <p>One query, run in your own Grafana or Datadog, with nothing to install. It prices every token the way <code>mycroftcompute</code> does, so the answer is a share of dollars, not of tokens.</p>
+        <p>On the author’s own Claude Code usage it reads <b>37%</b> at the five-minute rate and <b>48%</b> at the one-hour rate, over 14 days. Cache writes are 3% of those tokens.</p>
+        <p class="check-send">What the number means, and what it could be worth: <a href="https://github.com/negi6711/mycroftcompute/blob/main/docs/cache-check.md" rel="noopener">docs/cache-check.md</a></p>
+      </div>
+      <figure class="win check-win" data-reveal style="margin:0">
+        <div class="win-bar">
+          <svg class="logo" viewBox="0 0 256 279" aria-hidden="true" focusable="false"><use href="#l-grafana"/></svg>
+          <span class="crumb"><b>Grafana</b> / Explore / Code / Instant</span>
+          <button class="chip" type="button" data-copy="" data-copy-from="q-grafana" data-copy-said="Query copied"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z"/><path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5"/></g></svg><span>Copy query</span></button>
+        </div>
+        <pre class="check-q"><code id="q-grafana">100 *
+sum(
+  sum by (model) (last_over_time(claude_code_cost_usage_USD_total[14d]))
+  *
+  (
+    1.25 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheCreation"}[14d]))
+    /
+    (
+        sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="input"}[14d]))
+      + 1.25 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheCreation"}[14d]))
+      + 5 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="output"}[14d]))
+      + (
+            0.05 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheRead", model=~".*claude-opus-5-5.*"}[14d]))
+         or 0.025 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheRead", model=~".*claude-fable-5-1.*"}[14d]))
+         or 0.1 * sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheRead"}[14d]))
+        )
+    )
+  )
+)
+/
+sum(
+  sum by (model) (last_over_time(claude_code_cost_usage_USD_total[14d]))
+  and on (model)
+  sum by (model) (last_over_time(claude_code_token_usage_tokens_total{type="cacheCreation"}[14d]))
+)</code></pre>
+        <p class="check-note">The result is a percentage at the five-minute write rate. For the one-hour rate, change both <code>1.25</code> to <code>2</code>. Claude Code writes mostly at the one-hour rate, so the true share is between the two.</p>
+        <details class="check-dd">
+          <summary>On Datadog instead<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+          <div class="check-dd-body">
+            <ol>
+              <li>New dashboard, then a <b>Query Value</b> widget, time frame <b>Past 2 Weeks</b>.</li>
+              <li>Four queries on <code>claude_code.token.usage</code>, each <code>sum</code>, as count, <b>Take the sum</b>: <b>a</b> <code>type:cachecreation</code>, <b>b</b> <code>type:input</code>, <b>c</b> <code>type:cacheread</code>, <b>d</b> <code>type:output</code>.</li>
+              <li>Hide them and add this formula:</li>
+            </ol>
+            <p class="check-formula"><code id="q-datadog">100 * 1.25 * a / (b + 1.25 * a + 0.1 * c + 5 * d)</code><button class="chip" type="button" data-copy="" data-copy-from="q-datadog" data-copy-said="Formula copied"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z"/><path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5"/></g></svg><span>Copy</span></button></p>
+            <p>Mostly on Claude Opus 5.5? Change <code>0.1</code> to <code>0.05</code> (Fable 5.1: <code>0.025</code>). For the one-hour rate, change both <code>1.25</code> to <code>2</code>.</p>
+          </div>
+        </details>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Statement ============ -->
+<section class="statement-sec" aria-label="What mycroftcompute does differently">
+  <div class="wrap">
+    <p class="statement" data-scrub-words>Everybody in this market <span class="nw">collects and displays.</span> <em>Mycroft judges.</em></p>
+    <p class="namesake" data-reveal>Named after Mycroft Holmes, Sherlock’s cleverer brother, who never gathered the evidence himself. He worked out what it meant.</p>
+  </div>
+</section>
+
+<!-- ============ The command ============ -->
+<section class="section" id="app" aria-labelledby="app-h">
+  <div class="wrap">
+    <p class="label"><b>03</b>The command</p>
+    <div class="head-row">
+      <h2 class="h2" id="app-h" data-split>No dashboard. A report, in your terminal.</h2>
+      <p class="intro" data-reveal>No chart walls and no live tiles: one plain report, and a few flags around it. Run it on your own history in seconds, or point it at a team’s Grafana or Datadog.</p>
+    </div>
+
+    <ol class="flow" data-reveal>
+      <li><span class="n">1</span><b><code>mycroftcompute</code></b><p>Your own Claude Code history, read where it lies. Nothing is uploaded.</p></li>
+      <li class="shown"><span class="n">2</span><b><code>--discover</code></b><p>For a team backend: the labels its telemetry carries, before any usage is read.</p></li>
+      <li><span class="n">3</span><b>The report</b><p>Where the money went, then the findings. <a href="#findings">Shown above.</a></p></li>
+      <li class="shown"><span class="n">4</span><b><code>--db history.db</code></b><p>The next run opens with what moved since last time.</p></li>
+      <li><span class="n">5</span><b><code>--sample</code></b><p>An invented 24-developer team, to see the report before running it on your own.</p></li>
+    </ol>
+
+    <div class="app-pair">
+      <figure data-reveal>
+        <div class="win" role="img" aria-label="Output of --discover: eight telemetry labels, seven found and one missing, with what the missing repository label costs.">
+          <div class="win-bar"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg><span class="crumb"><b>--discover</b> / No usage read yet</span><span class="tag">Output</span></div>
+          <div class="pane">
+            <ul class="checks" data-checks>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Token counts</span><span class="lab">claude_code.token.usage</span></li>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Input/output split</span><span class="lab">type</span></li>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Model names</span><span class="lab">model</span></li>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Cache split</span><span class="lab">cacheRead, cacheCreation</span></li>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Developer identity</span><span class="lab">user.email</span></li>
+              <li class="miss"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 7V13"/><path stroke-linejoin="round" d="M12 16H12.0001"/></g></svg><span>Repository <span class="why">Not found. Spend cannot be attached to a codebase, so “is this where our work is meant to be?” goes unanswered.</span></span><span class="lab">missing</span></li>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Request segments</span><span class="lab">query_source, effort</span></li>
+              <li class="ok"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Reported cost</span><span class="lab">claude_code.cost.usage</span></li>
+            </ul>
+            <p class="ready"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg>Ready. Some findings will be unavailable: Repository.</p>
+          </div>
+        </div>
+        <figcaption>Seconds after pointing it at a backend. A gap becomes a stated limit, not a silent error.</figcaption>
+      </figure>
+
+      <figure data-reveal>
+        <div class="win" role="img" aria-label="Output of a second run with --db: $12,928.43 against $15,365.62, $2,437.20 less; the housekeeping finding stopped firing and two ceilings moved down.">
+          <div class="win-bar"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg><span class="crumb"><b>Since last time</b> / 29 Aug to 25 Sep against 1 to 28 Aug</span><span class="tag">Output</span></div>
+          <div class="pane">
+            <div class="cmp">
+              <div><small>29 Aug to 25 Sep</small><b>$12,928.43</b></div>
+              <div><small>1 to 28 Aug</small><b>$15,365.62</b></div>
+            </div>
+            <p class="delta"><b>$2,437.20 less, 16%.</b> Both windows are 28 days.</p>
+            <div class="moved">
+              <p class="cap">No longer firing</p>
+              <div class="moved-item"><s>11.5% of spend is the agent’s own housekeeping, on claude-opus-5</s></div>
+              <p class="cap">Still open, and the ceiling moved</p>
+              <div class="moved-item"><span>23.7% of your bill went on writing the prompt cache<span class="mv">$3,764.64 down to $2,823.48</span></span></div>
+              <div class="moved-item"><span>Moving claude-opus-5 to claude-haiku-4-5 would pay off, but not immediately<span class="mv">$5,884.62 down to $4,886.83</span></span></div>
+              <p class="moved-note">A finding that stopped firing is a finding that stopped firing. We cannot tell whether anything you did caused it, and we are not going to claim it did.</p>
+            </div>
+          </div>
+        </div>
+        <figcaption>Equal windows, compared. It never calls a shorter month a saving.</figcaption>
+      </figure>
+    </div>
+    <p class="sample-note">Sample report for an invented team. The arithmetic is real.</p>
+  </div>
+</section>
+
+<!-- ============ Trust ============ -->
+<section class="section" id="trust" aria-labelledby="trust-h">
+  <div class="wrap">
+    <p class="label"><b>04</b>What it reads</p>
+    <div class="head-row">
+      <h2 class="h2" id="trust-h" data-split>It reads daily totals. Nothing it could change.</h2>
+      <p class="intro" data-reveal>Checked end to end against real Claude Code data, locally and on both backends, in September 2026.</p>
+    </div>
+
+    <div class="trust-grid">
+      <div class="panel reads" data-reveal>
+        <h3>Reads <small>Locally, or read-only from a backend</small></h3>
+        <ul>
+          <li><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Your own Claude Code session files in <code>~/.claude/projects</code>, on your machine. Only each message’s token counts, model, date and project are kept.</span></li>
+          <li><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>Or a team backend, as daily totals: token counts by model and type, and the labels <code>user.email</code>, <code>query_source</code>, <code>effort</code>.</span></li>
+          <li><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linejoin="round" d="M8.5 12.5L10.5 14.5L15.5 9.5"/></g></svg><span>The backend’s own cost figure, to reconcile against.</span></li>
+        </ul>
+        <div class="backend-row"><span class="tile"><svg class="logo" viewBox="0 0 256 279" aria-hidden="true" focusable="false"><use href="#l-grafana"/></svg></span><div><b>Grafana Cloud, or any Prometheus-compatible backend</b><p>Cloud Access Policy token, <code>metrics:read</code> on one stack. Live-verified, Sep 2026.</p></div></div>
+        <div class="backend-row"><span class="tile"><svg class="logo" viewBox="0 0 256 275" aria-hidden="true" focusable="false"><use href="#l-datadog"/></svg></span><div><b>Datadog, every site</b><p>API key plus an Application key, <code>metrics_read</code> and <code>timeseries_query</code>. Live-verified, Sep 2026.</p></div></div>
+      </div>
+      <div class="panel never-p" data-reveal>
+        <h3>Never <small>Not sent, not stored</small></h3>
+        <ul>
+          <li><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M12 14C5 14 2 7 2 7M22 7C22 7 21.0586 9.19661 19 11.1288C18.0872 11.9856 16.9547 12.7904 15.5872 13.3287C14.5334 13.7435 13.34 14 12 14M12 14V16.5M15.5872 13.3287L17 15.5M19 11.1288L20.5 12.6288M8.41281 13.3287L7 15.5M5 11.1288L3.5 12.6288"/></svg><span>Sends anything anywhere. No account, no telemetry, and no network calls except to a backend you name.</span></li>
+          <li><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M12 14C5 14 2 7 2 7M22 7C22 7 21.0586 9.19661 19 11.1288C18.0872 11.9856 16.9547 12.7904 15.5872 13.3287C14.5334 13.7435 13.34 14 12 14M12 14V16.5M15.5872 13.3287L17 15.5M19 11.1288L20.5 12.6288M8.41281 13.3287L7 15.5M5 11.1288L3.5 12.6288"/></svg><span>Stores or prints prompts, responses or code. From a backend it never reads them, or logs and traces.</span></li>
+          <li><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M2 16C2 13.1716 2 11.7574 2.87868 10.8787C3.75736 10 5.17157 10 8 10H16C18.8284 10 20.2426 10 21.1213 10.8787C22 11.7574 22 13.1716 22 16C22 18.8284 22 20.2426 21.1213 21.1213C20.2426 22 18.8284 22 16 22H8C5.17157 22 3.75736 22 2.87868 21.1213C2 20.2426 2 18.8284 2 16Z"/><path d="M12 14V18"/><path d="M6 10V8C6 4.68629 8.68629 2 12 2C15.3137 2 18 4.68629 18 8V10"/></g></svg><span>Changes anything.</span></li>
+        </ul>
+        <p class="recon"><b>Stored only if you ask:</b> <code>--db</code> keeps daily totals and findings in a local file, so the next run can compare.</p>
+        <p class="recon"><b>Reconciles against your backend’s own number.</b> Where they differ, the report says why. Usually it is one-hour cache writes, which the metrics do not label.</p>
+      </div>
+    </div>
+
+    <ul class="facts" data-reveal-group>
+      <li data-reveal><b>19</b><span>models priced, from Anthropic, OpenAI and Google, with cache multipliers and minimums</span></li>
+      <li data-reveal><b>31<em>days</em></b><span>after the last price check, the report flags its prices as old</span></li>
+      <li data-reveal><b>0</b><span>dependencies: Python’s standard library only</span></li>
+      <li data-reveal><b>0</b><span>bytes uploaded, from your machine or your backend</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ Install ============ -->
+<section class="section pilot" id="install" aria-labelledby="install-h">
+  <div class="wrap">
+    <div class="pilot-card">
+      <div class="pilot-main">
+        <p class="label"><b>05</b>Install</p>
+        <h2 class="h2" id="install-h" data-split>One command. Nothing to sign up for.</h2>
+        <p class="intro" data-reveal>Run it once with <code>uvx</code>, or keep it installed with <code>pipx</code>. Python 3.12 or later; no dependencies.</p>
+        <p class="mail-alt install-line" data-reveal>
+          <span class="addr">uvx mycroftcompute</span>
+          <button class="chip" type="button" data-copy="uvx mycroftcompute" data-copy-said="Command copied"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z"/><path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5"/></g></svg><span>Copy</span></button>
+        </p>
+        <p class="mail-alt install-line" data-reveal>
+          <span class="addr">pipx install mycroftcompute</span>
+          <button class="chip" type="button" data-copy="pipx install mycroftcompute" data-copy-said="Command copied"><svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M6 11C6 8.17157 6 6.75736 6.87868 5.87868C7.75736 5 9.17157 5 12 5H15C17.8284 5 19.2426 5 20.1213 5.87868C21 6.75736 21 8.17157 21 11V16C21 18.8284 21 20.2426 20.1213 21.1213C19.2426 22 17.8284 22 15 22H12C9.17157 22 7.75736 22 6.87868 21.1213C6 20.2426 6 18.8284 6 16V11Z"/><path d="M6 19C4.34315 19 3 17.6569 3 16V10C3 6.22876 3 4.34315 4.17157 3.17157C5.34315 2 7.22876 2 11 2H15C16.6569 2 18 3.34315 18 5"/></g></svg><span>Copy</span></button>
+        </p>
+        <div class="ctas" data-reveal>
+          <a class="btn" href="https://github.com/negi6711/mycroftcompute" rel="noopener">View on GitHub <svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M18 15V6H9"/></svg></a>
+        </div>
+        <div class="qual" data-reveal>
+          <p><b>A personal project.</b> MIT licensed. It began as the engine of a product for platform teams and is kept as a tool. Prices are checked by hand, and the report says when they have aged.</p>
+        </div>
+      </div>
+      <div class="how">
+        <h3>Reading a team’s backend</h3>
+        <ol>
+          <li data-reveal><span><b>Send Claude Code’s telemetry.</b>A few settings, deployable to the whole team through Claude Code’s managed settings. Grafana needs cumulative counters; Datadog drops them.</span></li>
+          <li data-reveal><span><b>Create one read-only credential.</b>Grafana: <code>metrics:read</code> on one stack. Datadog: <code>metrics_read</code> and <code>timeseries_query</code>.</span></li>
+          <li data-reveal><span><b>Run <code>--discover</code>.</b>What the telemetry can and cannot support, before any usage is read.</span></li>
+          <li data-reveal><span><b>Read two weeks.</b><code>--days 14 --db team.db</code>, and run it again next month for what moved.</span></li>
+          <li class="opt" data-reveal><span><b>Step by step.</b><a href="https://github.com/negi6711/mycroftcompute/blob/main/docs/team-backends.md" rel="noopener">docs/team-backends.md</a>, including the two settings that silently lose every number.</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section" id="faq" aria-labelledby="faq-h" style="padding-top:0">
+  <div class="wrap faq-grid">
+    <div>
+      <p class="label"><b>06</b>Questions</p>
+      <h2 class="h2" id="faq-h" data-split>Questions.</h2>
+    </div>
+    <div class="faq-list">
+      <details>
+        <summary>What exactly does it read?<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <div class="faq-a"><p>Locally, Claude Code’s own session files in <code>~/.claude/projects</code> (or <code>$CLAUDE_CONFIG_DIR/projects</code>). It keeps each message’s token counts, model, date and project, and nothing else. From a team backend, daily totals of <code>claude_code.token.usage</code> and <code>claude_code.cost.usage</code> with their labels for model, token type, developer, request kind and effort. It never stores or prints prompts, responses or code.</p></div>
+      </details>
+      <details>
+        <summary>Does anything leave my machine?<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <div class="faq-a"><p>No. There is no account and no telemetry. Run on your own history, it makes no network calls at all; pointed at a backend, it only queries that backend, read-only, with a credential you create and can revoke.</p></div>
+      </details>
+      <details>
+        <summary>Do I need Grafana or Datadog?<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <div class="faq-a"><p>No. With no arguments it reads your own Claude Code history. The backends are for teams that already collect telemetry and want the report across everyone. <a href="https://github.com/negi6711/mycroftcompute/blob/main/docs/team-backends.md" rel="noopener">docs/team-backends.md</a> covers setting one up, including the traps: Grafana needs cumulative counters and silently gets nothing without them; Datadog silently drops them.</p></div>
+      </details>
+      <details>
+        <summary>Why is every figure “at most”, and why not add them up?<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <div class="faq-a"><p>Usage data cannot know everything about how your agent runs, so each dollar figure is the most a change could be worth over the period: a ceiling, never a promised saving.</p><p>The ceilings also overlap. In the sample, the housekeeping traffic is inside the claude-opus-5 total that the model-switch finding prices, so a sum would count it twice.</p></div>
+      </details>
+      <details>
+        <summary>How are the prices kept right?<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <div class="faq-a"><p>The table covers 19 models from Anthropic, OpenAI and Google, with cache read and write multipliers, per-model cache minimums and long-context surcharges, checked by hand against each vendor’s own pricing page. It is a personal project, so the table will age between updates; once it is more than 31 days old, the report says so beside the date. List prices only: negotiated or batch rates are lower.</p></div>
+      </details>
+      <details>
+        <summary>Does it cover Codex, Cursor or Copilot?<svg class="i" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 9L12 15L5 9"/></svg></summary>
+        <div class="faq-a"><p>Claude Code only. The price table already includes OpenAI and Google models, and the backend readers understand the OpenTelemetry standard for model usage, but only Claude Code has been checked against real data.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-top">
+      <div>
+        <a class="brand" href="#top">
+          <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect class="sq" x="2" y="8" width="13" height="13" rx="1.5"/><circle class="lens" cx="15" cy="9" r="6.25"/></svg>
+          mycroftcompute
+        </a>
+        <p class="foot-line">Where your Claude Code money goes, priced with the cache counted. Open source, MIT licensed.</p>
+      </div>
+      <div class="foot-links">
+        <span>Built by <a href="https://www.linkedin.com/in/adityanegi1123" rel="noopener noreferrer">Aditya Negi</a></span>
+        <a href="https://github.com/negi6711/mycroftcompute" rel="noopener">GitHub</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>No cookies, no analytics. This page loads nothing from anywhere else.</span>
+      <a href="licenses/CREDITS.txt">Fonts, icons and licences</a>
+    </div>
+  </div>
+</footer>
+
+<p class="sr-only" role="status" aria-live="polite" data-copy-status></p>
+
+<script src="js/gsap.min.js" defer></script>
+<script src="js/ScrollTrigger.min.js" defer></script>
+<script src="js/lenis.min.js" defer></script>
+<script src="js/main.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+Mycroft landing page: credits and licences
+
+Everything below is served from this site. Nothing is loaded from a third party at runtime.
+
+Fonts
+- Mona Sans, by the Mona Sans Project Authors (GitHub). SIL Open Font License 1.1.
+  Mona-Sans-OFL.txt. Obtained via @fontsource-variable/mona-sans 5.3.0.
+- Martian Mono, by Evil Martians. SIL Open Font License 1.1.
+  Martian-Mono-OFL.txt. Obtained via @fontsource-variable/martian-mono 5.3.0.
+
+Interface icons
+- Solar icon set by 480 Design (https://www.figma.com/community/file/1166831539721848736),
+  licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Obtained via Iconify.
+  Icons are used unmodified apart from size and colour.
+
+Brand marks
+- Grafana and Datadog marks from the Iconify "logos" set (gilbarbara/logos, CC0 1.0).
+  The marks are trademarks of Grafana Labs and Datadog, Inc. They appear only to say which
+  metrics backends Mycroft reads from. Neither company endorses Mycroft.
+
+JavaScript
+- GSAP 3.12.5 and ScrollTrigger 3.12.5, by GreenSock. Used under the GreenSock standard
+  licence: https://gsap.com/standard-license
+- Lenis 1.3.26, by darkroom.engineering. MIT licence, Lenis-MIT.txt.

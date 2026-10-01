@@ -1,0 +1,72 @@
+[project]
+name = "mycroftcompute"
+version = "0.1.0"
+description = "Where your Claude Code money went, priced with the prompt cache counted, and which changes would actually pay."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Aditya Negi" }]
+requires-python = ">=3.12"
+dependencies = []
+keywords = ["claude-code", "anthropic", "llm", "cost", "prompt-caching", "grafana", "datadog", "opentelemetry", "finops"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: System :: Monitoring",
+]
+
+[project.urls]
+Homepage = "https://www.mycroftcompute.com"
+Repository = "https://github.com/negi6711/mycroftcompute"
+Issues = "https://github.com/negi6711/mycroftcompute/issues"
+
+[project.scripts]
+mycroftcompute = "mycroftcompute.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mycroftcompute"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["site-src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "BLE", "SIM", "N", "ASYNC", "S", "RUF"]
+ignore = ["S101", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Fake credentials in tests are the point of the test, not a leak.
+"tests/**" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+mypy_path = "src"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
